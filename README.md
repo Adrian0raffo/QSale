@@ -6,7 +6,7 @@
 
 **Despliegue:** AWS EC2 + Dokploy + RDS PostgreSQL · **Postman:** [`postman_collection.json`](postman_collection.json)
 
-**URL verificada el 10 de noviembre de 2026:** [Health](https://api.3.95.66.213.sslip.io/actuator/health) · [Swagger UI](https://api.3.95.66.213.sslip.io/swagger-ui.html). Los recursos se detienen entre sesiones para conservar el crédito del laboratorio. Al iniciar EC2, comprueba su IP pública y actualiza el dominio si cambió.
+**URL verificada el 14 de noviembre de 2026:** [Health](https://api.98.81.93.181.sslip.io/actuator/health) · [Swagger UI](https://api.98.81.93.181.sslip.io/swagger-ui.html). Los recursos se detienen entre sesiones para conservar el crédito del laboratorio. Al iniciar EC2, comprueba su IP pública y actualiza el dominio si cambió.
 
 ---
 
