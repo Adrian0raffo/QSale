@@ -4,6 +4,7 @@ import type {
   AvailabilityInput,
   Commitment,
   CommitmentStatus,
+  DateRecommendation,
   Feasibility,
   Geography,
   Location,
@@ -17,6 +18,8 @@ import type {
   PlanFilters,
   PlanInput,
   PlanOption,
+  Reschedule,
+  RescheduleInput,
   User,
 } from '@qsale/contracts';
 
@@ -181,6 +184,27 @@ export function createQSaleApi(http: AxiosInstance) {
     createPlan: (data: PlanInput) => send<PlanDetail>('post', '/plans', data),
     updatePlan: (id: number, data: PlanInput) => send<PlanDetail>('put', '/plans/' + id, data),
     closePlan: (id: number) => send<PlanDetail>('patch', `/plans/${id}/close`),
+    reopenPlan: (id: number) => send<PlanDetail>('patch', `/plans/${id}/reopen`),
+    dateRecommendations: (id: number, signal?: AbortSignal) =>
+      read<DateRecommendation[]>(`/plans/${id}/date-recommendations`, undefined, signal),
+    reschedules: (id: number, signal?: AbortSignal) =>
+      read<Reschedule[]>(`/plans/${id}/reschedules`, undefined, signal),
+    createReschedule: (id: number, data: RescheduleInput) =>
+      contextual(send<Reschedule>('post', `/plans/${id}/reschedules`, data), {
+        400: 'Propón un día u otro lugar diferente al acuerdo actual. El día debe ser vigente y el lugar válido. Si al plan le falta día o lugar, quien organiza debe reabrirlo.',
+        409: 'El acuerdo cambió. Actualiza el plan antes de proponer otra reprogramación.',
+      }),
+    voteReschedule: (planId: number, id: number, accepted: boolean) =>
+      contextual(send<Reschedule>('put', `/plans/${planId}/reschedules/${id}/vote`, { accepted }), {
+        409: 'Esta propuesta terminó o cambió el acuerdo. Actualiza para ver el resultado.',
+      }),
+    applyReschedule: (planId: number, id: number) =>
+      contextual(send<Reschedule>('patch', `/plans/${planId}/reschedules/${id}/apply`), {
+        400: 'Todavía faltan votos afirmativos para alcanzar la mayoría y el mínimo de asistentes. Actualiza el plan.',
+        409: 'Esta propuesta terminó o cambió el acuerdo. Actualiza para ver el resultado.',
+      }),
+    withdrawReschedule: (planId: number, id: number) =>
+      send<Reschedule>('patch', `/plans/${planId}/reschedules/${id}/withdraw`),
     cancelPlan: (id: number) => send<PlanDetail>('patch', `/plans/${id}/cancel`),
     deletePlan: (id: number) => send<void>('delete', '/plans/' + id),
     participants: (id: number, signal?: AbortSignal) =>

@@ -17,6 +17,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PlanAccessService {
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     private final PlanRepository planRepository;
     private final PlanParticipantRepository participantRepository;
 
@@ -26,7 +29,9 @@ public class PlanAccessService {
     }
 
     public Optional<Plan> findPlanForUpdate(Long planId) {
-        return planRepository.findByIdForUpdate(planId);
+        Optional<Plan> plan = planRepository.findByIdForUpdate(planId);
+        plan.ifPresent(value -> entityManager.refresh(value, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE));
+        return plan;
     }
 
     public Plan getPlanAsMember(Long planId, User user) {
@@ -35,6 +40,30 @@ public class PlanAccessService {
             throw new ParticipantNotInPlanException("You are not a participant of plan " + planId);
         }
         return plan;
+    }
+
+    public Plan lockAsMember(Long planId, User user) {
+        Plan plan = findPlanForUpdate(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found with id " + planId));
+        if (!user.isAdmin() && !participantRepository.existsByPlanIdAndUserId(planId, user.getId())) {
+            throw new ParticipantNotInPlanException("You are not a participant of plan " + planId);
+        }
+        return plan;
+    }
+
+    public Plan lockAsOrganizer(Long planId, User user) {
+        Plan plan = lockAsMember(planId, user);
+        if (!user.isAdmin()) {
+            PlanParticipant member = participantRepository.findByPlanIdAndUserId(planId, user.getId()).orElseThrow();
+            if (!member.isOrganizer() || member.getStatus() != ParticipationStatus.JOINED)
+                throw new ForbiddenException("Only the organizer can perform this action");
+        }
+        return plan;
+    }
+
+    public void requireNotCancelled(Plan plan) {
+        if (plan.getStatus() == PlanStatus.CANCELLED)
+            throw new PlanClosedException("A cancelled plan cannot be modified");
     }
 
     public Plan getPlanAsOrganizer(Long planId, User user) {

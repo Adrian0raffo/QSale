@@ -43,6 +43,7 @@ public class CommitmentResponse {
     @Column(nullable = false)
     private CommitmentStatus status;
 
+    @Column(length = 500)
     private String note;
 
     @Column(nullable = false)

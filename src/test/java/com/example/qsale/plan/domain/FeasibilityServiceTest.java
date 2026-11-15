@@ -56,9 +56,14 @@ class FeasibilityServiceTest {
         stubParticipantAndAvailabilityCounts();
         PlanOption dateOption = new PlanOption();
         dateOption.setId(10L);
+        dateOption.setStartsOn(java.time.LocalDate.now().plusDays(10));
         when(commitmentRepository.countByPlanIdAndStatus(1L, CommitmentStatus.CONFIRMED)).thenReturn(2L);
         when(optionRepository.findByPlanIdAndType(1L, OptionType.DATE)).thenReturn(List.of(dateOption));
-        when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of());
+        PlanOption placeOption = new PlanOption();
+        placeOption.setId(11L);
+        placeOption.setLocation(new com.example.qsale.location.domain.Location());
+        when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of(placeOption));
+        when(voteRepository.countByOptionId(11L)).thenReturn(2L);
         when(voteRepository.countByOptionId(10L)).thenReturn(2L);
 
         feasibilityService.updateFeasibility(plan);
@@ -72,6 +77,7 @@ class FeasibilityServiceTest {
         stubParticipantAndAvailabilityCounts();
         PlanOption dateOption = new PlanOption();
         dateOption.setId(10L);
+        dateOption.setStartsOn(java.time.LocalDate.now().plusDays(10));
         when(commitmentRepository.countByPlanIdAndStatus(1L, CommitmentStatus.CONFIRMED)).thenReturn(1L);
         when(optionRepository.findByPlanIdAndType(1L, OptionType.DATE)).thenReturn(List.of(dateOption));
         when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of());

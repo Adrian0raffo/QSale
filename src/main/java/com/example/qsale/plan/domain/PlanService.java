@@ -16,6 +16,8 @@ import com.example.qsale.plan.events.PlanUpdatedEvent;
 import com.example.qsale.plan.infrastructure.PlanRepository;
 import com.example.qsale.user.domain.User;
 import com.example.qsale.user.domain.UserService;
+import com.example.qsale.commitment.domain.CommitmentStatus;
+import com.example.qsale.commitment.infrastructure.CommitmentResponseRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -51,6 +53,7 @@ public class PlanService {
     private final UserService userService;
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final CommitmentResponseRepository commitments;
 
     @PreAuthorize("isAuthenticated()")
     @Transactional
@@ -99,7 +102,7 @@ public class PlanService {
     @Transactional
     public PlanDetailDto updatePlan(Long planId, PlanRequestDto dto) {
         validateDates(dto);
-        Plan plan = planAccessService.getPlanAsOrganizer(planId, userService.getCurrentUser());
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
         planAccessService.requireOpen(plan);
         modelMapper.map(dto, plan);
         PlanDetailDto response = toDetail(planRepository.save(plan), userService.getCurrentUser().getId());
@@ -111,7 +114,7 @@ public class PlanService {
     @PreAuthorize("@planAuthorization.isOrganizer(#planId, authentication)")
     @Transactional
     public PlanDetailDto closePlan(Long planId) {
-        Plan plan = planAccessService.getPlanAsOrganizer(planId, userService.getCurrentUser());
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
         planAccessService.requireOpen(plan);
         feasibilityService.updateFeasibility(plan);
         if (plan.getFeasibilityStatus() != FeasibilityStatus.READY_TO_CLOSE) {
@@ -119,21 +122,38 @@ public class PlanService {
                     + plan.getFeasibilityStatus() + ", score " + plan.getFeasibilityScore() + ")");
         }
         planOptionService.selectBestOptions(plan);
+        plan.setAgreementVersion(plan.getAgreementVersion() + 1);
         return changeStatus(plan, PlanStatus.CLOSED);
     }
 
     @PreAuthorize("@planAuthorization.isOrganizer(#planId, authentication)")
     @Transactional
     public PlanDetailDto cancelPlan(Long planId) {
-        Plan plan = planAccessService.getPlanAsOrganizer(planId, userService.getCurrentUser());
-        planAccessService.requireOpen(plan);
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
+        planAccessService.requireNotCancelled(plan);
         return changeStatus(plan, PlanStatus.CANCELLED);
     }
 
     @PreAuthorize("@planAuthorization.isOrganizer(#planId, authentication)")
     @Transactional
+    public PlanDetailDto reopenPlan(Long planId) {
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
+        if (plan.getStatus() != PlanStatus.CLOSED) throw new InvalidOperationException("Only a confirmed plan can be reopened");
+        plan.setStatus(PlanStatus.OPEN); plan.setClosedAt(null);
+        plan.setAgreementVersion(plan.getAgreementVersion() + 1);
+        plan.getOptions().forEach(option -> option.setSelected(false));
+        commitments.findByPlanId(planId).forEach(response -> {
+            if (response.getStatus() == CommitmentStatus.CONFIRMED) response.setStatus(CommitmentStatus.INTERESTED);
+        });
+        feasibilityService.updateFeasibility(plan);
+        eventPublisher.publishEvent(new PlanStatusChangedEvent(this, planId));
+        return toDetail(plan, userService.getCurrentUser().getId());
+    }
+
+    @PreAuthorize("@planAuthorization.isOrganizer(#planId, authentication)")
+    @Transactional
     public void deletePlan(Long planId) {
-        Plan plan = planAccessService.getPlanAsOrganizer(planId, userService.getCurrentUser());
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
         planRepository.delete(plan);
     }
 

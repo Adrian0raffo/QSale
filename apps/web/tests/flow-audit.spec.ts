@@ -15,6 +15,42 @@ async function account(page: Page) {
   return () => ({ Authorization: token });
 }
 
+test('coordinate changes and rapid navigation do not leave map callbacks running; denied GPS has a manual path', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: (_success: unknown, error: (value: object) => void) =>
+          error({ code: 1 }),
+      },
+    });
+  });
+  await account(page);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByRole('link', { name: 'Mi perfil', exact: true }).click();
+    await page.getByLabel('Latitud', { exact: true }).fill(String(-12.1 - attempt / 100));
+    await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
+    await page.getByRole('link', { name: 'Mis planes', exact: true }).first().click();
+  }
+  await page.getByRole('link', { name: 'Mi perfil', exact: true }).click();
+  await page.getByRole('button', { name: 'Usar mi ubicación', exact: true }).click();
+  await expect(
+    page.getByText(
+      'No pudimos acceder a tu ubicación. Revisa el permiso o elige un punto manualmente.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page.getByLabel('Latitud', { exact: true }).fill('-12.12');
+  await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
+  await page.getByRole('button', { name: 'Guardar mi perfil', exact: true }).click();
+  await page.reload();
+  await expect(page.getByLabel('Latitud', { exact: true })).toHaveValue('-12.12');
+  expect(errors).toEqual([]);
+});
+
 test('recovers from a server error and an offline write needs an explicit retry', async ({
   page,
   request,

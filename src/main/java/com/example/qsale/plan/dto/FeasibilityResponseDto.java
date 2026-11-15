@@ -8,6 +8,8 @@ public record FeasibilityResponseDto(
         FeasibilityStatus status,
         long confirmedParticipants,
         Integer minParticipants,
-        long totalParticipants
+        long totalParticipants,
+        boolean dateReady,
+        boolean placeReady
 ) {
 }

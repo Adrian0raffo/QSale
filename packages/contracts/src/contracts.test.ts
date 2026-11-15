@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { dateInputError, dateOptionInput, validDay, todayInLima } from './index';
 import {
   safeReturnPath,
   signUpSchema,
@@ -61,4 +62,23 @@ it('lets a numeric draft be cleared and replaced without displaying NaN', () => 
       budget: parseNumberDraft('40,50', true),
     }).success,
   ).toBe(true);
+});
+
+it('permits a day without inventing an hour and validates real calendar days', () => {
+  const day = todayInLima();
+  expect(dateInputError(day)).toBe('');
+  expect(dateOptionInput(day)).toEqual({ startsOn: day });
+  expect(validDay('2027-02-30')).toBe(false);
+  expect(dateInputError('2027-02-30')).not.toBe('');
+  expect(dateInputError('2099-12-12', '25:00')).not.toBe('');
+  expect(dateInputError('2099-12-12', '', '2099-12-13', '15:00')).not.toBe('');
+  expect(dateInputError('2099-12-12', '15:00', '2099-12-12', '15:00')).not.toBe('');
+  expect(dateOptionInput('2099-12-12', '', '2099-12-13')).toEqual({
+    startsOn: '2099-12-12',
+    endsOn: '2099-12-13',
+  });
+  expect(dateOptionInput('2099-12-12', '15:00')).toEqual({
+    startsOn: '2099-12-12',
+    startsAt: '2099-12-12T15:00',
+  });
 });

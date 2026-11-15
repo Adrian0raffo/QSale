@@ -37,8 +37,8 @@ public class AvailabilityService {
     public AvailabilityResponseDto addAvailability(Long planId, AvailabilityRequestDto dto) {
         validateTimes(dto);
         User user = userService.getCurrentUser();
-        Plan plan = planAccessService.getPlanAsMember(planId, user);
-        planAccessService.requireOpen(plan);
+        Plan plan = planAccessService.lockAsMember(planId, user);
+        planAccessService.requireNotCancelled(plan);
         participantService.requireJoined(planId, user);
 
         Availability availability = new Availability(plan, user, dto.getAvailableDate(),
@@ -61,8 +61,8 @@ public class AvailabilityService {
     @Transactional
     public void deleteAvailability(Long planId, Long availabilityId) {
         User user = userService.getCurrentUser();
-        Plan plan = planAccessService.getPlanAsMember(planId, user);
-        planAccessService.requireOpen(plan);
+        Plan plan = planAccessService.lockAsMember(planId, user);
+        planAccessService.requireNotCancelled(plan);
         Availability availability = availabilityRepository.findById(availabilityId)
                 .filter(found -> found.getPlan().getId().equals(planId))
                 .orElseThrow(() -> new ResourceNotFoundException("Availability " + availabilityId + " not found in plan " + planId));

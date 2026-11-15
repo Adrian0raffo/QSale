@@ -31,10 +31,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
 public class PlanOptionService {
+
+    @Value("${plans.time-zone:America/Lima}")
+    private String timeZone = "America/Lima";
 
     private final PlanOptionRepository optionRepository;
     private final PlanParticipantRepository participantRepository;
@@ -50,12 +56,16 @@ public class PlanOptionService {
     @Transactional
     public OptionResponseDto createOption(Long planId, OptionRequestDto dto) {
         User user = userService.getCurrentUser();
-        Plan plan = planAccessService.getPlanAsMember(planId, user);
+        Plan plan = planAccessService.lockAsMember(planId, user);
         planAccessService.requireOpen(plan);
         planAccessService.requireJoined(planId, user);
         validateOption(dto);
 
         PlanOption option = modelMapper.map(dto, PlanOption.class);
+        if (option.getType() == OptionType.DATE) {
+            option.setStartsOn(dto.getStartsOn() != null ? dto.getStartsOn() : dto.getStartsAt().toLocalDate());
+            option.setEndsOn(dto.getEndsOn() != null ? dto.getEndsOn() : dto.getEndsAt() == null ? null : dto.getEndsAt().toLocalDate());
+        }
         if (option.getType() == OptionType.PLACE) {
             option.setEstimateStatus(TravelEstimateStatus.PENDING);
         }
@@ -145,7 +155,7 @@ public class PlanOptionService {
     @PreAuthorize("@planAuthorization.isOrganizer(#planId, authentication)")
     @Transactional
     public void deleteOption(Long planId, Long optionId) {
-        Plan plan = planAccessService.getPlanAsOrganizer(planId, userService.getCurrentUser());
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
         planAccessService.requireOpen(plan);
         PlanOption option = optionRepository.findByIdAndPlanId(optionId, planId)
                 .orElseThrow(() -> new ResourceNotFoundException("Option " + optionId + " not found in plan " + planId));
@@ -160,24 +170,50 @@ public class PlanOptionService {
 
     @Transactional
     public void selectBestOptions(Plan plan) {
-        for (OptionType type : OptionType.values()) {
-            optionRepository.findByPlanIdAndType(plan.getId(), type).stream()
-                    .filter(option -> voteRepository.countByOptionId(option.getId()) > 0)
-                    .max(Comparator.comparingLong(option -> voteRepository.countByOptionId(option.getId())))
-                    .ifPresent(option -> option.setSelected(true));
-        }
+        PlanOption date = bestVotedOption(plan.getId(), OptionType.DATE);
+        PlanOption place = bestVotedOption(plan.getId(), OptionType.PLACE);
+        optionRepository.findByPlanId(plan.getId()).forEach(option -> option.setSelected(false));
+        date.setSelected(true);
+        place.setSelected(true);
+        plan.setTentativeStartDate(date.getEffectiveDate());
+        plan.setTentativeEndDate(date.getEffectiveEndDate());
+    }
+
+    private PlanOption bestVotedOption(Long planId, OptionType type) {
+        return optionRepository.findByPlanIdAndType(planId, type).stream()
+                .filter(option -> type != OptionType.DATE || option.isUpcoming(ZoneId.of(timeZone)))
+                .filter(option -> type != OptionType.PLACE || option.getLocation() != null)
+                .filter(option -> voteRepository.countByOptionId(option.getId()) > 0)
+                .max(Comparator.<PlanOption>comparingLong(option -> voteRepository.countByOptionId(option.getId()))
+                        .thenComparing(option -> -option.getId()))
+                .orElseThrow(() -> new InvalidOperationException("A voted day and place are required before closing"));
     }
 
     private void validateOption(OptionRequestDto dto) {
-        if (dto.getType() == OptionType.DATE && dto.getStartsAt() == null) {
-            throw new InvalidOperationException("A DATE option requires startsAt");
+        if (dto.getType() == OptionType.DATE && dto.getStartsAt() == null && dto.getStartsOn() == null) {
+            throw new InvalidOperationException("A DATE option requires a day; the time is optional");
         }
         if (dto.getType() == OptionType.PLACE && dto.getLocation() == null) {
             throw new InvalidOperationException("A PLACE option requires a location");
         }
-        if (dto.getStartsAt() != null && dto.getEndsAt() != null && dto.getEndsAt().isBefore(dto.getStartsAt())) {
+        if (dto.getType() == OptionType.DATE && dto.getLocation() != null)
+            throw new InvalidOperationException("A DATE option cannot contain a place");
+        if (dto.getType() == OptionType.PLACE && (dto.getStartsAt() != null || dto.getStartsOn() != null || dto.getEndsAt() != null || dto.getEndsOn() != null))
+            throw new InvalidOperationException("A PLACE option cannot contain dates");
+        if (dto.getEndsAt() != null && dto.getStartsAt() == null)
+            throw new InvalidOperationException("A final time requires an initial time");
+        if (dto.getStartsAt() != null && dto.getEndsAt() != null && !dto.getEndsAt().isAfter(dto.getStartsAt())) {
             throw new InvalidOperationException("endsAt must be after startsAt");
         }
+        if (dto.getStartsOn() != null && dto.getStartsAt() != null && !dto.getStartsOn().equals(dto.getStartsAt().toLocalDate())) {
+            throw new InvalidOperationException("startsOn and startsAt must refer to the same day");
+        }
+        if (dto.getEndsOn() != null && dto.getEndsAt() != null && !dto.getEndsOn().equals(dto.getEndsAt().toLocalDate())) {
+            throw new InvalidOperationException("endsOn and endsAt must refer to the same day");
+        }
+        LocalDate start = dto.getStartsOn() != null ? dto.getStartsOn() : dto.getStartsAt() == null ? null : dto.getStartsAt().toLocalDate();
+        LocalDate end = dto.getEndsOn() != null ? dto.getEndsOn() : dto.getEndsAt() == null ? null : dto.getEndsAt().toLocalDate();
+        if (start != null && end != null && end.isBefore(start)) throw new InvalidOperationException("The final day cannot precede the initial day");
     }
 
     private OptionResponseDto toResponse(PlanOption option, long participants) {

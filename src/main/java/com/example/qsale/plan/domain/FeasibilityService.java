@@ -18,10 +18,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
 public class FeasibilityService {
+
+    @Value("${plans.time-zone:America/Lima}")
+    private String timeZone = "America/Lima";
 
     private static final int READY_THRESHOLD = 75;
     private static final int TO_BE_DEFINED_THRESHOLD = 40;
@@ -40,9 +46,10 @@ public class FeasibilityService {
         Plan plan = planAccessService.getPlanAsMember(planId, userService.getCurrentUser());
         long confirmed = countConfirmed(planId);
         int score = calculateScore(plan, confirmed);
-        return new FeasibilityResponseDto(plan.getId(), score, resolveStatus(score, confirmed, plan.getMinParticipants()),
+        boolean day = hasVotedChoice(planId, OptionType.DATE), place = hasVotedChoice(planId, OptionType.PLACE);
+        return new FeasibilityResponseDto(plan.getId(), score, resolveStatus(score, confirmed, plan.getMinParticipants(), day, place),
                 confirmed, plan.getMinParticipants(),
-                participantRepository.countByPlanIdAndStatus(planId, ParticipationStatus.JOINED));
+                participantRepository.countByPlanIdAndStatus(planId, ParticipationStatus.JOINED), day, place);
     }
 
     @Transactional
@@ -62,7 +69,8 @@ public class FeasibilityService {
         long confirmed = countConfirmed(plan.getId());
         int score = calculateScore(plan, confirmed);
         plan.setFeasibilityScore(score);
-        plan.setFeasibilityStatus(resolveStatus(score, confirmed, plan.getMinParticipants()));
+        plan.setFeasibilityStatus(resolveStatus(score, confirmed, plan.getMinParticipants(),
+                hasVotedChoice(plan.getId(), OptionType.DATE), hasVotedChoice(plan.getId(), OptionType.PLACE)));
     }
 
     public int calculateOptionScore(PlanOption option, long votes, long participants) {
@@ -82,7 +90,9 @@ public class FeasibilityService {
 
     private double calculateAgreement(Long planId, long participants) {
         return Arrays.stream(OptionType.values())
-                .map(type -> optionRepository.findByPlanIdAndType(planId, type))
+                .map(type -> optionRepository.findByPlanIdAndType(planId, type).stream()
+                        .filter(option -> type != OptionType.DATE || option.isUpcoming(ZoneId.of(timeZone)))
+                        .filter(option -> type != OptionType.PLACE || option.getLocation() != null).toList())
                 .filter(options -> !options.isEmpty())
                 .mapToDouble(options -> Math.min((double) maxVotes(options) / participants, 1.0))
                 .average()
@@ -107,8 +117,15 @@ public class FeasibilityService {
         return commitmentRepository.countByPlanIdAndStatus(planId, CommitmentStatus.CONFIRMED);
     }
 
-    private FeasibilityStatus resolveStatus(int score, long confirmed, int minParticipants) {
-        if (confirmed >= minParticipants && score >= READY_THRESHOLD) {
+    private boolean hasVotedChoice(Long planId, OptionType type) {
+        return optionRepository.findByPlanIdAndType(planId, type).stream()
+                .filter(option -> type != OptionType.DATE || option.isUpcoming(ZoneId.of(timeZone)))
+                .filter(option -> type != OptionType.PLACE || option.getLocation() != null)
+                .anyMatch(option -> voteRepository.countByOptionId(option.getId()) > 0);
+    }
+
+    private FeasibilityStatus resolveStatus(int score, long confirmed, int minParticipants, boolean day, boolean place) {
+        if (confirmed >= minParticipants && score >= READY_THRESHOLD && day && place) {
             return FeasibilityStatus.READY_TO_CLOSE;
         }
         if (score >= TO_BE_DEFINED_THRESHOLD) {

@@ -46,7 +46,7 @@ public class ParticipantService {
     @PreAuthorize("@planAuthorization.isOrganizer(#planId, authentication)")
     @Transactional
     public ParticipantResponseDto inviteParticipant(Long planId, ParticipantInviteDto dto) {
-        Plan plan = planAccessService.getPlanAsOrganizer(planId, userService.getCurrentUser());
+        Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
         planAccessService.requireOpen(plan);
         User invitee = userService.getUserByEmail(dto.getEmail().toLowerCase(Locale.ROOT));
         if (participantRepository.existsByPlanIdAndUserId(planId, invitee.getId())) {
@@ -63,6 +63,8 @@ public class ParticipantService {
     public ParticipantResponseDto joinByInviteCode(String inviteCode) {
         Plan plan = planRepository.findByInviteCode(inviteCode.toUpperCase())
                 .orElseThrow(() -> new ResourceNotFoundException("No plan found with invite code " + inviteCode));
+        plan = planAccessService.findPlanForUpdate(plan.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Plan no longer exists"));
         return join(plan, userService.getCurrentUser());
     }
 
@@ -70,7 +72,7 @@ public class ParticipantService {
     @Transactional
     public ParticipantResponseDto acceptInvitation(Long planId) {
         User user = userService.getCurrentUser();
-        Plan plan = planAccessService.getPlanAsMember(planId, user);
+        Plan plan = planAccessService.lockAsMember(planId, user);
         if (!participantRepository.existsByPlanIdAndUserId(planId, user.getId())) {
             throw new ForbiddenException("You have not been invited to plan " + planId);
         }
@@ -106,8 +108,8 @@ public class ParticipantService {
     public void removeParticipant(Long planId, Long userId) {
         User currentUser = userService.getCurrentUser();
         Plan plan = currentUser.getId().equals(userId)
-                ? planAccessService.getPlanAsMember(planId, currentUser)
-                : planAccessService.getPlanAsOrganizer(planId, currentUser);
+                ? planAccessService.lockAsMember(planId, currentUser)
+                : planAccessService.lockAsOrganizer(planId, currentUser);
         planAccessService.requireOpen(plan);
 
         PlanParticipant participant = participantRepository.findByPlanIdAndUserId(planId, userId)
@@ -115,9 +117,9 @@ public class ParticipantService {
         if (participant.isOrganizer()) {
             throw new InvalidOperationException("The organizer cannot be removed from the plan");
         }
-        voteRepository.deleteByOption_Plan_IdAndUser_Id(planId, userId);
-        availabilityRepository.deleteByPlanIdAndUserId(planId, userId);
-        commitmentRepository.deleteByPlanIdAndUserId(planId, userId);
+        plan.getOptions().forEach(option -> option.getVotes().removeIf(vote -> vote.getUser().getId().equals(userId)));
+        plan.getAvailabilities().removeIf(availability -> availability.getUser().getId().equals(userId));
+        plan.getCommitments().removeIf(commitment -> commitment.getUser().getId().equals(userId));
         plan.getParticipants().remove(participant);
         eventPublisher.publishEvent(new PlanChangedEvent(this, plan.getId()));
         if (participant.getStatus() == ParticipationStatus.JOINED) {

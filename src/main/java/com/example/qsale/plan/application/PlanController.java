@@ -64,6 +64,11 @@ public class PlanController {
         return ResponseEntity.ok(planService.cancelPlan(id));
     }
 
+    @PatchMapping("/{id}/reopen")
+    public ResponseEntity<PlanDetailDto> reopenPlan(@PathVariable Long id) {
+        return ResponseEntity.ok(planService.reopenPlan(id));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePlan(@PathVariable Long id) {
         planService.deletePlan(id);

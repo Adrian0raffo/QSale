@@ -28,7 +28,7 @@ export function MapView({
   useEffect(() => {
     if (!element.current) return;
     const center = initial ?? points[0] ?? { latitude: -12.115, longitude: -77.025 };
-    map.current = L.map(element.current, { scrollWheelZoom: false }).setView(
+    map.current = L.map(element.current, { scrollWheelZoom: false, zoomAnimation: false }).setView(
       [center.latitude, center.longitude],
       12,
     );
@@ -41,12 +41,14 @@ export function MapView({
     map.current.on('click', (event: L.LeafletMouseEvent) =>
       select.current?.({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
     );
-    const observer = new ResizeObserver(() => map.current?.invalidateSize());
+    const observer = new ResizeObserver(() => map.current?.invalidateSize({ pan: false }));
     observer.observe(element.current);
     return () => {
       observer.disconnect();
+      map.current?.stop();
       map.current?.remove();
       map.current = null;
+      markers.current = null;
     };
   }, []);
   useEffect(() => {
@@ -69,6 +71,7 @@ export function MapView({
       map.current.fitBounds(L.latLngBounds(displayed.map((p) => [p.latitude, p.longitude])), {
         padding: [40, 40],
         maxZoom: 14,
+        animate: false,
       });
   }, [points, initial]);
   return (

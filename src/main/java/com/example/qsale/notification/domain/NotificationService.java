@@ -9,6 +9,7 @@ import com.example.qsale.option.domain.OptionType;
 import com.example.qsale.option.domain.PlanOption;
 import com.example.qsale.option.infrastructure.PlanOptionRepository;
 import com.example.qsale.participant.domain.PlanParticipant;
+import com.example.qsale.participant.domain.ParticipationStatus;
 import com.example.qsale.participant.infrastructure.PlanParticipantRepository;
 import com.example.qsale.plan.domain.Plan;
 import com.example.qsale.plan.domain.PlanAccessService;
@@ -122,14 +123,27 @@ public class NotificationService {
     public void notifyPlanStatusChanged(Long planId) {
         Plan plan = planAccessService.getPlan(planId);
         boolean closed = plan.getStatus() == PlanStatus.CLOSED;
-        NotificationType type = closed ? NotificationType.PLAN_CLOSED : NotificationType.PLAN_CANCELLED;
+        NotificationType type = closed ? NotificationType.PLAN_CLOSED : plan.isOpen() ? NotificationType.PLAN_REOPENED : NotificationType.PLAN_CANCELLED;
         String message = closed
                 ? "El plan " + plan.getName() + " quedó confirmado"
+                : plan.isOpen() ? "El organizador reabrió " + plan.getName() + ". Revisen las opciones y vuelvan a confirmar."
                 : "El plan " + plan.getName() + " fue cancelado";
         for (PlanParticipant participant : participantRepository.findByPlanId(planId)) {
             EmailContent email = closed ? buildClosedEmail(plan, participant.getUser()) : null;
             notify(participant.getUser(), plan, type, message, email);
         }
+    }
+
+    @Transactional
+    public void notifyOrganizer(Plan plan, NotificationType type, String message) {
+        notify(plan.getCreator(), plan, type, message, null);
+    }
+
+    @Transactional
+    public void notifyJoinedParticipants(Plan plan, NotificationType type, String message) {
+        participantRepository.findByPlanId(plan.getId()).stream()
+                .filter(member -> member.getStatus() == ParticipationStatus.JOINED)
+                .forEach(member -> notify(member.getUser(), plan, type, message, null));
     }
 
     private EmailContent buildClosedEmail(Plan plan, User recipient) {
@@ -147,7 +161,14 @@ public class NotificationService {
     private String selectedLabel(List<PlanOption> selected, OptionType type) {
         return selected.stream()
                 .filter(option -> option.getType() == type)
-                .map(PlanOption::getLabel)
+                .map(option -> {
+                    if (type != OptionType.DATE || option.getEffectiveDate() == null) return option.getLabel();
+                    String time = option.getStartsAt() == null ? "Hora por acordar" :
+                            option.getStartsAt().toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " (Lima)";
+                    String end = option.getEffectiveEndDate() == null ? "" : " – " + option.getEffectiveEndDate() +
+                            (option.getEndsAt() == null ? "" : " · " + option.getEndsAt().toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " (Lima)");
+                    return option.getEffectiveDate() + " · " + time + end + " · " + option.getLabel();
+                })
                 .findFirst()
                 .orElse("Por definir");
     }

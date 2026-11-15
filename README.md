@@ -18,6 +18,8 @@ El cumplimiento individual fue indicado por el equipo. Los aportes deben detalla
 
 **Publicación móvil:** [QSale en Expo, rama preview](https://expo.dev/accounts/gonzagl05/projects/qsale/updates/dc186f21-174e-4b8a-95c4-02d23966730a). Los paquetes Android/iOS están publicados. El equipo comprobó la apertura en Expo Go en iPhone con datos móviles y Metro detenido, y guardó y recuperó la ubicación del perfil.
 
+La publicación enlazada corresponde al commit `f40ce94`; las correcciones de coordinación descritas más abajo requieren actualizar backend, web y Expo.
+
 Los recursos AWS se detienen entre sesiones para conservar el crédito del laboratorio; las URLs requieren que EC2 y RDS estén encendidas. Al iniciar EC2, comprueba su IP pública. Si cambia, actualiza los dominios, las URLs de los servicios y la publicación móvil.
 
 ---
@@ -68,7 +70,10 @@ Los recursos AWS se detienen entre sesiones para conservar el crédito del labor
 | Nivel de compromiso | Confirmado, Me interesa o No puedo, en vez de respuestas ambiguas |
 | Comparación geográfica | Distancia y tiempo promedio del grupo a cada lugar |
 | Semáforo de viabilidad | Índice 0–100: `NOT_VIABLE`, `TO_BE_DEFINED` o `READY_TO_CLOSE` |
-| Cierre del plan | Solo con semáforo en verde; fija la fecha y el lugar más votados |
+| Cierre del plan | Exige mínimo de asistentes y viabilidad suficiente, con día vigente y lugar votados; la hora es opcional |
+| Asistencia después del cierre | Actualiza el conteo y avisa si se pierde el mínimo; conserva el acuerdo del grupo |
+| Reprogramación | Propuestas con sí/no, mayoría y mínimo de asistentes; solo quien organiza aplica el cambio |
+| Fechas recomendadas | Cruce de disponibilidad opcional, con coincidencia horaria y datos faltantes explícitos |
 | Notificaciones y correos | Invitación, cambios, mínimo alcanzado, cierre o cancelación |
 
 ### Tecnologías utilizadas
@@ -123,9 +128,13 @@ erDiagram
     USER ||--o{ NOTIFICATION : recibe
     USER ||--o| LOCATION : tiene
     PLAN_OPTION ||--o| LOCATION : refiere
+    PLAN ||--o{ RESCHEDULE_PROPOSAL : recibe
+    USER ||--o{ RESCHEDULE_PROPOSAL : propone
+    RESCHEDULE_PROPOSAL ||--o{ RESCHEDULE_VOTE : registra
+    USER ||--o{ RESCHEDULE_VOTE : vota
 ```
 
-`User` guarda identidad, rol y ubicación opcional. `Plan` mantiene el presupuesto, mínimo de asistentes, fechas, código de invitación, estado y semáforo. `PlanParticipant` relaciona usuarios con planes y diferencia organizador, invitado y miembro unido. `PlanOption` contiene fechas o lugares propuestos; un lugar se asocia a `Location`, que guarda dirección y coordenadas. `Vote`, `Availability` y `CommitmentResponse` registran las decisiones individuales. `Notification` persiste avisos, fecha de lectura y estado de envío. La base incluye unicidad de email, código de invitación, voto por usuario/opción y compromiso por usuario/plan; las claves foráneas e índices sostienen integridad y consultas frecuentes. Los DTO y Bean Validation restringen rangos, longitud y formato antes de guardar.
+`User` guarda identidad, rol y ubicación opcional. `Plan` mantiene el presupuesto, mínimo de asistentes, fechas, código de invitación, estado y semáforo. `PlanParticipant` relaciona usuarios con planes y diferencia organizador, invitado y miembro unido. `PlanOption` contiene fechas o lugares propuestos; un lugar se asocia a `Location`, que guarda dirección y coordenadas. `Vote`, `Availability` y `CommitmentResponse` registran las decisiones individuales. `Notification` persiste avisos, fecha de lectura y estado de envío. `RescheduleProposal` guarda una alternativa de acuerdo con su versión, día, hora opcional, rango de fechas, lugar y vencimiento; `RescheduleVote` conserva la respuesta sí/no única de cada integrante. La base incluye unicidad de email, código de invitación, voto por usuario/opción y compromiso por usuario/plan; las claves foráneas e índices sostienen integridad y consultas frecuentes. Los DTO y Bean Validation restringen rangos, longitud y formato antes de guardar.
 
 ## 5. Manejo de errores
 
@@ -199,13 +208,14 @@ npm run check
 npm test
 npm run build:web
 npm run test:web
+npm run test:mobile-form
 ```
 
-La prueba de navegador usa una API aislada en `127.0.0.1:19080`, PostgreSQL y Mailpit; crea cuentas y planes de prueba y elimina sus planes al terminar. No la ejecutes contra una base compartida o de producción. Para comprobar los paquetes nativos, ejecuta desde `apps/mobile`:
+Las pruebas web también abren la vista previa Expo para comprobar el intercambio entre clientes. Playwright inicia los servidores web y Expo si no están en ejecución. La prueba de navegador usa una API aislada en `127.0.0.1:19080`, PostgreSQL y Mailpit; crea cuentas y planes de prueba y elimina sus planes al terminar. No la ejecutes contra una base compartida o de producción. Para comprobar los paquetes nativos, ejecuta desde `apps/mobile`:
 
 ```sh
 npx expo-doctor
-npx expo export --platform android --platform ios --output-dir dist
+npx expo export --platform all --output-dir dist
 ```
 
 Exportar comprueba la generación de los paquetes; la cámara, el GPS, los permisos, la persistencia y la navegación también deben probarse en el dispositivo. `apps/mobile/eas.json` prepara perfiles de desarrollo y distribución interna; esos perfiles no implican que exista un build publicado.
@@ -278,7 +288,7 @@ El equipo confirmó además registro desde Safari en iPhone con Wi-Fi desactivad
 
 Las mediciones fueron secuenciales, después de una lectura de calentamiento, desde la computadora de desarrollo. No constituyen una prueba de carga ni certifican disponibilidad continua. La disponibilidad durante la evaluación debe comprobarse por separado.
 
-### Revisión de flujos del 15 de noviembre
+### Auditoría inicial de flujos del 15 de noviembre
 
 La auditoría local corrigió el aislamiento entre sesiones, la conservación de notas al cambiar la asistencia, la protección del último administrador, la reutilización de invitaciones, la eliminación explícita de ubicación y los horarios incompletos. También añadió recuperación de rutas que no cargan, conservación de borradores al refrescar, mensajes de invitación con pasos de recuperación y navegación móvil al detalle sin duplicar pantallas. Las estimaciones se invalidan antes de recalcularlas cuando cambia la ubicación o la participación.
 
@@ -286,7 +296,37 @@ La auditoría local corrigió el aislamiento entre sesiones, la conservación de
 
 Validación: 97 pruebas backend, 19 pruebas unitarias de contratos/cliente/sesión, ocho recorridos web, dos recorridos del formulario y navegación móvil ejecutados en navegador, TypeScript, compilación web, exportaciones Android/iOS y Expo Doctor 20/20. La auditoría de dependencias de producción no reportó vulnerabilidades. Las pruebas móviles de navegador no sustituyen la comprobación física de cámara, GPS, permisos denegados y SecureStore. Estas correcciones requieren un nuevo despliegue del backend/web y otra publicación móvil; la comprobación pública anterior corresponde a la versión previa.
 
-El cierre con día y lugar obligatorios, hora opcional, cambios de asistencia después de confirmar, recomendaciones por disponibilidad y propuestas de reprogramación son reglas acordadas para la siguiente implementación. La versión auditada conserva todavía las reglas anteriores de cierre; no se presentan esas funciones como terminadas.
+### Coordinación y reprogramación
+
+La implementación posterior a esa auditoría exige día y lugar para confirmar el plan. La hora es opcional: `startsOn` guarda el día sin inventar una hora; `startsAt` permite añadirla. Las fechas vencidas se excluyen del cierre y del cálculo de acuerdos. Las propuestas de fecha y lugar no pueden mezclar campos de ambos tipos ni tener una hora final anterior o igual a la inicial.
+
+Después de confirmar, cada integrante puede actualizar su asistencia y su nota. Una baja conserva el día, el lugar y las confirmaciones de los demás. Si el conteo cae por debajo del mínimo, el organizador recibe un aviso dentro de QSale; el sistema no reabre ni reduce el mínimo automáticamente.
+
+Una propuesta de reprogramación conserva el acuerdo vigente durante la votación. Una mayoría estricta de votos negativos la rechaza. Una mayoría estricta afirmativa que alcanza además el mínimo permite al organizador aplicar el cambio. Al aplicarlo, los votos sí se convierten en asistencia confirmada, los no en no asistencia y las personas que no votaron quedan pendientes. Cada propuesta termina como aplicada, rechazada, retirada, vencida o reemplazada. Vence al llegar la hora propuesta o, sin hora, al terminar ese día en Lima.
+
+Al mover un plan de varios días se conserva su extensión en días; con horas de inicio y fin definidas se conserva la duración. Cambiar solo el lugar mantiene las fechas. El organizador puede reabrir manualmente para cambiar la duración o decidir de nuevo: se conservan opciones y votos, las asistencias confirmadas pasan a pendientes y se cierran las reprogramaciones activas.
+
+Las recomendaciones comparan los días y franjas registradas, sin exigir disponibilidad ni convertirla en confirmación. Indican cuántos integrantes coinciden, cuántos no registraron disponibilidad y si existe un horario común. Los detalles abiertos se consultan periódicamente para reflejar cambios entre web y móvil sin reemplazar los borradores de formularios.
+
+Estas operaciones están disponibles en ambas interfaces. Las rutas añadidas son:
+
+| Método y ruta bajo `/api/v1` | Operación |
+|---|---|
+| `GET /plans/{id}/date-recommendations` | Consultar hasta cinco días recomendados |
+| `GET /plans/{id}/reschedules` | Consultar propuestas y resultados |
+| `POST /plans/{id}/reschedules` | Proponer día, hora opcional y/o lugar; registra el sí de quien propone |
+| `PUT /plans/{id}/reschedules/{proposalId}/vote` | Responder con `accepted: true` o `false` |
+| `PATCH /plans/{id}/reschedules/{proposalId}/apply` | Aplicar una alternativa elegible, solo organizador |
+| `PATCH /plans/{id}/reschedules/{proposalId}/withdraw` | Retirar una alternativa activa, autor u organizador |
+| `PATCH /plans/{id}/reopen` | Reabrir manualmente un plan confirmado |
+
+El backend aplica Flyway V3 y V4 sobre los datos existentes, con validación del esquema y prueba de conservación de fechas previas. Despliega primero el backend y después los clientes. Comprueba día/lugar elegidos, baja de asistencia y reprogramación desde dos cuentas; solo entonces publica la actualización móvil. AWS permanece detenido durante el desarrollo local.
+
+La revisión también corrige presupuesto vacío guardado como cero en web, notas de 500 caracteres rechazadas por la API, notas del grupo que no se mostraban, indicadores de cierre obsoletos y callbacks del mapa web después de salir de la pantalla. El mapa móvil comunica fallos del proveedor y permite reintentar o usar coordenadas; el escáner permite continuar por código si no abre la cámara.
+
+Validación local: 113 pruebas backend con PostgreSQL, 20 pruebas de lógica/sesión, 11 recorridos web (dos incluyen interacción con Expo), cuatro pruebas móviles de navegador, 81 solicitudes y 100 comprobaciones de Postman, TypeScript, compilación web y exportación iOS/Android. Expo Doctor aprobó 20/20 y la auditoría npm de producción no reportó vulnerabilidades. El equipo confirmó guardar ubicación y usar cámara en iPhone conectado al mismo Wi-Fi, además del acceso web local. Las pruebas de navegador no certifican permisos físicos denegados ni todos los fallos posibles de SecureStore.
+
+La revisión funcional local no equivale a un nuevo despliegue público ni garantiza una nota. Quedan por completar la publicación de estas correcciones, los aportes reales de la tabla inicial y el ensayo del pitch y las preguntas técnicas. GitHub Actions depende de resolver el bloqueo de la cuenta; las pruebas locales no se presentan como CI remoto aprobado.
 
 ### Crédito y desconexión de Render
 
