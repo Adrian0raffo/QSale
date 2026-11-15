@@ -38,8 +38,10 @@ public class PlanController {
     @GetMapping
     public ResponseEntity<PlanPageResponseDto> getMyPlans(@RequestParam(required = false) PlanStatus status,
                                                           @RequestParam(defaultValue = "0") int page,
-                                                          @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(planService.getMyPlans(status, page, size));
+                                                          @RequestParam(defaultValue = "10") int size,
+                                                          @RequestParam(defaultValue = "") String search,
+                                                          @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        return ResponseEntity.ok(planService.getMyPlans(status, page, size, search, sort));
     }
 
     @GetMapping("/{id}")

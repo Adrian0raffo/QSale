@@ -1,12 +1,15 @@
 package com.example.qsale.option.dto;
 
 import com.example.qsale.location.dto.LocationDto;
+import com.example.qsale.location.domain.TravelEstimateSource;
+import com.example.qsale.location.domain.TravelEstimateStatus;
 import com.example.qsale.option.domain.OptionType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -25,4 +28,8 @@ public class OptionResponseDto {
     private String proposedByName;
     private long voteCount;
     private int score;
+    private boolean hasVoted;
+    private TravelEstimateSource estimateSource;
+    private TravelEstimateStatus estimateStatus;
+    private Instant estimateUpdatedAt;
 }

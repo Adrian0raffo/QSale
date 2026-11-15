@@ -1184,7 +1184,7 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/plans?status=OPEN&page=0&size=10",
-            "description": "Planes en los que participa el usuario. Filtro opcional por status (OPEN, CLOSED, CANCELLED) y paginación con page/size (máximo 50)."
+            "description": "Planes en los que participa el usuario. Filtro opcional por status (OPEN, CLOSED, CANCELLED) y paginación con page/size (máximo 100)."
           },
           "response": [
             {
@@ -1193,7 +1193,7 @@
                 "method": "GET",
                 "header": [],
                 "url": "{{baseUrl}}/plans?status=OPEN&page=0&size=10",
-                "description": "Planes en los que participa el usuario. Filtro opcional por status (OPEN, CLOSED, CANCELLED) y paginación con page/size (máximo 50)."
+                "description": "Planes en los que participa el usuario. Filtro opcional por status (OPEN, CLOSED, CANCELLED) y paginación con page/size (máximo 100)."
               },
               "status": "OK",
               "code": 200,
@@ -3571,6 +3571,141 @@
                 }
               ]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9.5. Frontend contracts",
+      "item": [
+        {
+          "name": "Planes: búsqueda, orden y página de 100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Paginación y tamaño 100\", () => { pm.expect(page.size).to.eql(100); pm.expect(page.page).to.eql(0); pm.expect(page.totalElements).to.be.at.least(1); });",
+                  "pm.test(\"Contexto de participación persistido\", () => page.content.forEach(plan => { pm.expect(plan.currentUserRole).to.be.oneOf([\"ORGANIZER\", \"GUEST\"]); pm.expect(plan.currentUserParticipationStatus).to.be.oneOf([\"INVITED\", \"JOINED\"]); }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/plans?page=0&size=100&search=Cena&sort=name,asc",
+            "description": "Búsqueda en servidor por nombre/descripción, orden permitido y paginación de hasta 100 elementos. Solo devuelve planes del usuario; la respuesta incluye su rol y estado de participación."
+          }
+        },
+        {
+          "name": "Notificaciones: segundo endpoint paginado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Página y contador global de no leídas\", () => { pm.expect(page.content).to.be.an(\"array\"); pm.expect(page.size).to.eql(100); pm.expect(page.totalElements).to.be.a(\"number\"); pm.expect(page.totalPages).to.be.a(\"number\"); pm.expect(page.unreadCount).to.be.a(\"number\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/notifications/page?page=0&size=100",
+            "description": "Segundo listado paginado para los frontends. unreadCount incluye todas las notificaciones no leídas del destinatario, no solo la página. El endpoint original sin /page conserva su respuesta de lista."
+          }
+        },
+        {
+          "name": "Notificaciones: filtro de no leídas antes de paginar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Filtro aplicado en servidor\", () => { pm.expect(page.totalElements).to.eql(page.unreadCount); page.content.forEach(notification => pm.expect(notification.readAt).to.eql(null)); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/notifications/page?page=0&size=1&unreadOnly=true",
+            "description": "El filtro se aplica al conjunto completo antes de calcular totales y página."
+          }
+        },
+        {
+          "name": "Opciones: voto propio y procedencia de estimaciones",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const options = pm.response.json();",
+                  "pm.test(\"Voto propio reconstruido desde la API\", () => options.forEach(option => pm.expect(option.hasVoted).to.be.a(\"boolean\")));",
+                  "pm.test(\"Estado y origen geográfico explícitos\", () => options.forEach(option => { pm.expect(option.estimateStatus).to.be.oneOf([\"NOT_APPLICABLE\", \"PENDING\", \"READY\", \"UNAVAILABLE\"]); if (option.type === \"DATE\") pm.expect(option.estimateStatus).to.eql(\"NOT_APPLICABLE\"); if (option.estimateStatus === \"READY\") { pm.expect(option.estimateSource).to.be.oneOf([\"ROUTING\", \"HAVERSINE\", \"UNKNOWN\"]); } }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}/options",
+            "description": "hasVoted corresponde únicamente al usuario autenticado. estimateSource distingue rutas, aproximación Haversine y valores anteriores cuyo origen no se conoce; estimateUpdatedAt utiliza una fecha UTC cuando se recalcula."
+          }
+        },
+        {
+          "name": "400 - Orden de planes no permitido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/plans?sort=creator.password,asc",
+            "description": "El servidor permite ordenar solo por campos explícitamente autorizados."
+          }
+        },
+        {
+          "name": "400 - Página de notificaciones inválida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/notifications/page?page=-1&size=10",
+            "description": "Las páginas negativas no se ejecutan ni exponen notificaciones de otros destinatarios."
           }
         }
       ]

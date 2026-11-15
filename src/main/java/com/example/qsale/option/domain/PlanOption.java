@@ -1,6 +1,8 @@
 package com.example.qsale.option.domain;
 
 import com.example.qsale.location.domain.Location;
+import com.example.qsale.location.domain.TravelEstimateSource;
+import com.example.qsale.location.domain.TravelEstimateStatus;
 import com.example.qsale.plan.domain.Plan;
 import com.example.qsale.user.domain.User;
 import com.example.qsale.vote.domain.Vote;
@@ -27,6 +29,7 @@ import org.hibernate.annotations.OptimisticLock;
 import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -75,6 +78,19 @@ public class PlanOption {
 
     @OptimisticLock(excluded = true)
     private Integer avgTravelMinutes;
+
+    @OptimisticLock(excluded = true)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
+    private TravelEstimateSource estimateSource;
+
+    @OptimisticLock(excluded = true)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private TravelEstimateStatus estimateStatus = TravelEstimateStatus.NOT_APPLICABLE;
+
+    @OptimisticLock(excluded = true)
+    private Instant estimateUpdatedAt;
 
     @Column(nullable = false)
     private boolean selected = false;

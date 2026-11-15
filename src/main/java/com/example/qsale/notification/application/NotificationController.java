@@ -2,6 +2,7 @@ package com.example.qsale.notification.application;
 
 import com.example.qsale.notification.domain.NotificationService;
 import com.example.qsale.notification.dto.NotificationResponseDto;
+import com.example.qsale.notification.dto.NotificationPageResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +25,14 @@ public class NotificationController {
     public ResponseEntity<List<NotificationResponseDto>> getMyNotifications(
             @RequestParam(defaultValue = "false") boolean unreadOnly) {
         return ResponseEntity.ok(notificationService.getMyNotifications(unreadOnly));
+    }
+
+    @GetMapping("/page")
+    public ResponseEntity<NotificationPageResponseDto> getMyNotificationsPage(
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(notificationService.getMyNotificationsPage(unreadOnly, page, size));
     }
 
     @PatchMapping("/{id}/read")

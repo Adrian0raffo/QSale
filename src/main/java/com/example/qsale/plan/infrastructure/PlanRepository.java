@@ -25,4 +25,14 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
     Page<Plan> findByParticipantsUserId(Long userId, Pageable pageable);
 
     Page<Plan> findByParticipantsUserIdAndStatus(Long userId, PlanStatus status, Pageable pageable);
+
+    @Query("""
+            select p from Plan p join p.participants participant
+            where participant.user.id = :userId
+              and (:status is null or p.status = :status)
+              and (:search = '' or locate(lower(:search), lower(p.name)) > 0
+                   or locate(lower(:search), lower(coalesce(p.description, ''))) > 0)
+            """)
+    Page<Plan> searchMyPlans(@Param("userId") Long userId, @Param("status") PlanStatus status,
+                            @Param("search") String search, Pageable pageable);
 }

@@ -86,7 +86,7 @@ flowchart LR
     Listeners --> ORS[OpenRouteService]
 ```
 
-Los controladores reciben y validan solicitudes HTTP; los servicios concentran reglas y permisos; los repositorios encapsulan persistencia. Se usan DTO separados para entrada y salida, de modo que contraseñas y relaciones JPA internas no se publican. Flyway aplica `V1__initial_schema.sql` y Hibernate valida la correspondencia con las entidades. `@Version` en planes y opciones permite detectar modificaciones concurrentes.
+Los controladores reciben y validan solicitudes HTTP; los servicios concentran reglas y permisos; los repositorios encapsulan persistencia. Se usan DTO separados para entrada y salida, de modo que contraseñas y relaciones JPA internas no se publican. Flyway aplica las migraciones versionadas y Hibernate valida la correspondencia con las entidades. `@Version` en planes y opciones permite detectar modificaciones concurrentes.
 
 ## 4. Modelo de entidades
 
@@ -194,7 +194,7 @@ Render es el despliegue anterior. Retirar `render.yaml` no desconecta sus servic
 ## 11. Apéndices
 
 - [Colección Postman](postman_collection.json): solicitudes, ejemplos y variables de prueba.
-- [Migración inicial](src/main/resources/db/migration/V1__initial_schema.sql): tablas, restricciones e índices.
+- [Migraciones](src/main/resources/db/migration): esquema inicial y metadatos de estimación.
 - [CI](.github/workflows/ci.yml): validación automática con Maven y Testcontainers.
 - [Dockerfile](Dockerfile): imagen del backend desplegada con Dokploy en EC2.
 - **Licencia:** MIT, especificada en [LICENSE](LICENSE).

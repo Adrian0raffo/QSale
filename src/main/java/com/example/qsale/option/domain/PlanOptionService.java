@@ -4,6 +4,7 @@ import com.example.qsale.exceptions.InvalidOperationException;
 import com.example.qsale.exceptions.ResourceNotFoundException;
 import com.example.qsale.location.domain.GeoService;
 import com.example.qsale.location.domain.Location;
+import com.example.qsale.location.domain.TravelEstimateStatus;
 import com.example.qsale.location.dto.TravelEstimateDto;
 import com.example.qsale.option.dto.OptionRequestDto;
 import com.example.qsale.option.dto.OptionResponseDto;
@@ -28,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +56,9 @@ public class PlanOptionService {
         validateOption(dto);
 
         PlanOption option = modelMapper.map(dto, PlanOption.class);
+        if (option.getType() == OptionType.PLACE) {
+            option.setEstimateStatus(TravelEstimateStatus.PENDING);
+        }
         option.setProposedBy(user);
         plan.addOption(option);
         optionRepository.save(option);
@@ -92,23 +98,36 @@ public class PlanOptionService {
         if (origins.isEmpty() || option.getLocation() == null) {
             option.setAvgDistanceKm(null);
             option.setAvgTravelMinutes(null);
+            option.setEstimateSource(null);
+            option.setEstimateStatus(TravelEstimateStatus.UNAVAILABLE);
+            option.setEstimateUpdatedAt(Instant.now());
             return;
         }
         TravelEstimateDto estimate = geoService.estimateAverageTravel(origins, option.getLocation());
         option.setAvgDistanceKm(estimate.avgDistanceKm());
         option.setAvgTravelMinutes(estimate.avgTravelMinutes());
+        option.setEstimateSource(estimate.source());
+        option.setEstimateStatus(TravelEstimateStatus.READY);
+        option.setEstimateUpdatedAt(Instant.now());
     }
 
     @PreAuthorize("@planAuthorization.isMember(#planId, authentication)")
     @Transactional(readOnly = true)
     public List<OptionResponseDto> getOptions(Long planId, OptionType type) {
-        planAccessService.getPlanAsMember(planId, userService.getCurrentUser());
+        User user = userService.getCurrentUser();
+        planAccessService.getPlanAsMember(planId, user);
         List<PlanOption> options = type == null
                 ? optionRepository.findByPlanId(planId)
                 : optionRepository.findByPlanIdAndType(planId, type);
         long participants = participantRepository.countByPlanIdAndStatus(planId, ParticipationStatus.JOINED);
+        Set<Long> votedOptions = options.isEmpty() ? Set.of()
+                : Set.copyOf(voteRepository.findVotedOptionIds(user.getId(), options.stream().map(PlanOption::getId).toList()));
         return options.stream()
-                .map(option -> toResponse(option, participants))
+                .map(option -> {
+                    OptionResponseDto response = toResponse(option, participants);
+                    response.setHasVoted(votedOptions.contains(option.getId()));
+                    return response;
+                })
                 .sorted(Comparator.comparingInt(OptionResponseDto::getScore).reversed())
                 .toList();
     }
