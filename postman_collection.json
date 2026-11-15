@@ -30,6 +30,18 @@
           "pm.collectionVariables.set(\"nextRescheduleDate\", rescheduleDay.toISOString().slice(0, 10));"
         ]
       }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "try {",
+          "  const data = pm.response.json();",
+          "  if (typeof data.version === \"number\") pm.collectionVariables.set(\"planVersion\", data.version);",
+          "} catch (_) {}"
+        ]
+      }
     }
   ],
   "variable": [
@@ -136,6 +148,10 @@
     {
       "key": "nextRescheduleDate",
       "value": ""
+    },
+    {
+      "key": "planVersion",
+      "value": "0"
     }
   ],
   "item": [

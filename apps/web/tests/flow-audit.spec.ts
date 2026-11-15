@@ -152,7 +152,7 @@ test('refreshing an edit keeps the draft and updates untouched fields', async ({
     await page.getByLabel('¿Cómo se llama el plan?').fill('Mi borrador sin guardar');
     const update = await request.put(`${api}/plans/${id}`, {
       headers: headers(),
-      data: { name: 'Cambio de otra sesión', type: 'DINNER', minParticipants: 2, budget: 50 },
+      data: { name: 'Cambio de otra sesión', type: 'DINNER', minParticipants: 2, budget: 50, version: (await created.json()).version },
     });
     expect(update.ok()).toBe(true);
     await page.clock.install();
@@ -196,4 +196,25 @@ test('inviting a new email provides a registration path and existing members can
   } finally {
     await request.delete(`${api}/plans/${plan.id}`, { headers: headers() });
   }
+});
+
+test('a stale edit preserves its draft and requires review before saving over newer data', async ({page, request}) => {
+  const headers = await account(page);
+  const created = await request.post(api+'/plans', {headers:headers(), data:{name:'Original draft',type:'OTHER',minParticipants:2,budget:10}});
+  const plan=await created.json();
+  try {
+    await page.goto(`/plans/${plan.id}/edit`);
+    await expect(page.getByLabel('¿Cómo se llama el plan?')).toHaveValue('Original draft');
+    await page.getByLabel('¿Cómo se llama el plan?').fill('My preserved draft');
+    const updated=await request.put(`${api}/plans/${plan.id}`, {headers:headers(),data:{name:'Changed elsewhere',type:'OTHER',minParticipants:2,budget:50,version:plan.version}});
+    expect(updated.status()).toBe(200);
+    await page.getByRole('button',{name:'Guardar cambios',exact:true}).click();
+    await expect(page.getByRole('alert')).toContainText('El plan cambió en otra sesión');
+    await expect(page.getByLabel('¿Cómo se llama el plan?')).toHaveValue('My preserved draft');
+    await expect(page.getByLabel('Presupuesto estimado (S/)')).toHaveValue('50');
+    await page.getByRole('button',{name:'Guardar cambios',exact:true}).click();
+    await expect(page).toHaveURL(new RegExp(`/plans/${plan.id}$`));
+    const saved=await (await request.get(`${api}/plans/${plan.id}`,{headers:headers()})).json();
+    expect(saved).toMatchObject({name:'My preserved draft',budget:50});
+  } finally { await request.delete(`${api}/plans/${plan.id}`,{headers:headers()}); }
 });
