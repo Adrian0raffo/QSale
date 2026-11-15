@@ -19,6 +19,9 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class PlanRequestDto {
 
+    @PositiveOrZero
+    private Long version;
+
     @NotBlank
     @Size(min = 3, max = 100)
     private String name;

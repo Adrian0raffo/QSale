@@ -59,10 +59,13 @@ export default function PlanForm({ editing = false }: { editing?: boolean }) {
     },
   });
   const loadedPlan = useRef<number | null>(null);
+  const editVersion = useRef<number | undefined>(undefined);
   const dirty = useRef(dirtyFields);
   dirty.current = dirtyFields;
   useEffect(() => {
     if (query.data) {
+      const keepDraft = loadedPlan.current === query.data.id && Object.keys(dirty.current).length > 0;
+      if (!keepDraft) editVersion.current = query.data.version;
       reset(
         { ...query.data, description: query.data.description ?? '' },
         {
@@ -210,12 +213,21 @@ export default function PlanForm({ editing = false }: { editing?: boolean }) {
             }
             try {
               const plan = await (editing
-                ? api.updatePlan(planId, values)
+                ? api.updatePlan(planId, { ...values, version: editVersion.current })
                 : api.createPlan(values));
               await cache.invalidateQueries();
               toast(editing ? 'Plan actualizado.' : 'Tu plan está listo para recibir ideas.');
               router.dismissTo(('/plans/' + plan.id) as '/plans/[id]');
             } catch (error) {
+              if (editing && error instanceof ApiError && error.status === 409) {
+                const latest = await query.refetch();
+                if (latest.data) {
+                  editVersion.current = latest.data.version;
+                  reset({ ...latest.data, description: latest.data.description ?? '' }, { keepDirtyValues: true });
+                }
+                setError('root', { message: 'El plan cambió en otra sesión. Conservamos tu borrador y actualizamos los demás campos. Revísalos antes de volver a guardar.' });
+                return;
+              }
               setError('root', { message: (error as Error).message });
             }
           })}

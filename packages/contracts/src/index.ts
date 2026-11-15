@@ -46,6 +46,7 @@ export interface Page<T> {
 
 export interface Plan {
   id: number;
+  version: number;
   name: string;
   type: PlanType;
   status: PlanStatus;
@@ -70,6 +71,7 @@ export interface PlanDetail extends Plan {
 }
 
 export interface PlanInput {
+  version?: number;
   name: string;
   description?: string;
   type: PlanType;
@@ -330,6 +332,7 @@ export const locationSchema = z.object({
 
 export const planSchema = z
   .object({
+    version: z.number().int().nonnegative().optional(),
     name: z
       .string()
       .trim()
