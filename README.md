@@ -4,7 +4,9 @@
 
 **Integrantes:** Gonzalo Gaviño · Mathias Pariona · Adriano Raffo
 
-**Deploy:** [qsale-api.onrender.com](https://qsale-api.onrender.com) · **Health:** [`/actuator/health`](https://qsale-api.onrender.com/actuator/health) · **Swagger:** [Swagger UI](https://qsale-api.onrender.com/swagger-ui.html) · **Postman:** [`postman_collection.json`](postman_collection.json)
+**Despliegue:** AWS EC2 + Dokploy + RDS PostgreSQL · **Postman:** [`postman_collection.json`](postman_collection.json)
+
+**URL verificada el 10 de noviembre de 2026:** [Health](https://api.3.95.66.213.sslip.io/actuator/health) · [Swagger UI](https://api.3.95.66.213.sslip.io/swagger-ui.html). Los recursos se detienen entre sesiones para conservar el crédito del laboratorio. Al iniciar EC2, comprueba su IP pública y actualiza el dominio si cambió.
 
 ---
 
@@ -18,7 +20,7 @@
 6. [Medidas de seguridad](#6-medidas-de-seguridad)
 7. [Eventos y asincronía](#7-eventos-y-asincronía)
 8. [GitHub & Management](#8-github--management)
-9. [Ejecución local](#9-ejecución-local)
+9. [Ejecución local y despliegue](#9-ejecución-local-y-despliegue)
 10. [Conclusión](#10-conclusión)
 11. [Apéndices](#11-apéndices)
 
@@ -80,7 +82,7 @@ flowchart LR
     Repository --> DB[(PostgreSQL)]
     Service -. publica .-> Events[ApplicationEvents]
     Events -. "@Async" .-> Listeners[Listeners]
-    Listeners --> Mail[SMTP]
+    Listeners --> Mail[Resend / SMTP]
     Listeners --> ORS[OpenRouteService]
 ```
 
@@ -121,13 +123,13 @@ Las consultas JPA parametrizadas evitan concatenar SQL de entrada del cliente, l
 
 El registro, las invitaciones, los cambios de plan, los votos y las respuestas publican eventos. Los listeners recalculan la viabilidad, crean notificaciones y preparan correos; `@EnableAsync` y un `ThreadPoolTaskExecutor` desacoplan las operaciones externas del tiempo de respuesta HTTP. Hay plantillas Thymeleaf para bienvenida, invitación, plan listo y cierre. Las notificaciones se pueden listar y marcar como leídas, y un fallo del proveedor de correo queda registrado como estado `FAILED` cuando se intenta enviar el aviso.
 
-En desarrollo, JavaMailSender usa Mailpit en `localhost:1025`; su bandeja está en `http://localhost:8025`. Render gratuito bloquea los puertos SMTP habituales, por lo que producción envía por la API HTTPS de Resend si se configuran `RESEND_API_KEY` y `MAIL_FROM`. Con el dominio de prueba `onboarding@resend.dev`, Resend limita el envío a la dirección autorizada en su cuenta; para enviar invitaciones a cualquier usuario se necesita verificar un dominio propio. Sin esa configuración, los emails externos **no están operativos**, aunque la API y las notificaciones internas sigan funcionando. Una respuesta aceptada por la API del proveedor tampoco prueba entrega final: se debe verificar un email recibido.
+En desarrollo, JavaMailSender usa Mailpit en `localhost:1025`, con bandeja en `http://localhost:8025`. En AWS, el correo usa la API HTTPS de Resend con `RESEND_API_KEY` y `MAIL_FROM`. El remitente `onboarding@resend.dev` solo permite destinatarios autorizados por Resend; las invitaciones a otros usuarios requieren un dominio verificado. Comprueba la recepción real, además de la respuesta del proveedor.
 
 ## 8. GitHub & Management
 
-El equipo usa ramas para cambios de funcionalidades y correcciones, pull requests para integrar a `main` y commits descriptivos. La acción en `.github/workflows/ci.yml` se ejecuta en PRs y pushes a `main`, prepara Java 21 y corre `mvn -B clean verify`; eso evita fusionar cambios que rompen compilación o pruebas. La evidencia de revisiones, asignación de tareas, fechas y milestones debe quedar registrada en GitHub Issues/Projects: un README no sustituye esa actividad ni permite atribuirla si no existe. Las claves de servicios externos se mantienen en variables de entorno de Render y no en las ramas.
+El equipo integra cambios mediante pull requests hacia `main`. `.github/workflows/ci.yml` ejecuta `mvn -B clean verify` con Java 21; no despliega. Revisiones y tareas se registran en GitHub Issues/Projects. El CI del PR #10 quedó bloqueado por facturación de GitHub; el PR documenta la validación local. Los secretos se configuran en Dokploy.
 
-## 9. Ejecución local
+## 9. Ejecución local y despliegue
 
 Se necesitan Java 21, Maven y Docker. Desde la raíz del repositorio, ejecutar `docker compose up -d`, configurar un `JWT_SECRET` aleatorio de al menos 32 caracteres y lanzar `./mvnw spring-boot:run` (en Windows, `.\mvnw.cmd spring-boot:run`). PostgreSQL queda en el puerto 5433, Mailpit en 8025 y la API en 8080. La primera ejecución aplica Flyway; no usar `ddl-auto=create` en bases compartidas. Comprobar `GET /actuator/health` y abrir `/swagger-ui.html`.
 
@@ -136,32 +138,64 @@ Las variables de entorno principales son:
 | Variable | Obligatoria | Uso |
 |---|---:|---|
 | `JWT_SECRET` | Sí | Firma de tokens JWT; usar una cadena aleatoria de al menos 32 caracteres. |
-| `DATABASE_URL` | Render | Conexión PostgreSQL proporcionada por Render. |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Local | Conexión local; Docker Compose usa PostgreSQL en el puerto 5433. |
+| `SPRING_DATASOURCE_URL` | AWS | URL JDBC de RDS con `sslmode=require`. |
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | Local | Host, puerto y base; por defecto `localhost:5433/qsale`. |
+| `DB_USER`, `DB_PASSWORD` | AWS | Credenciales de RDS; local usa `postgres` por defecto. |
+| `DATABASE_URL` | Opcional | Alternativa PostgreSQL compatible; déjala ausente en AWS para no reemplazar la conexión a RDS. |
 | `MAPS_API_KEY` | Opcional | Clave de OpenRouteService para rutas y tiempos reales; sin ella se usa Haversine. |
-| `RESEND_API_KEY` | Opcional | Clave de Resend para enviar correo por HTTPS en Render. |
+| `RESEND_API_KEY` | Opcional | Clave de Resend para enviar correo por HTTPS. |
 | `MAIL_FROM` | Recomendada | Remitente verificado, por ejemplo `QSale <onboarding@resend.dev>`. |
 | `CORS_ALLOWED_ORIGINS` | Opcional | Orígenes permitidos por CORS, separados por comas. |
 
-Las claves de Resend y OpenRouteService se generan en sus respectivos paneles y se copian únicamente en el apartado **Environment** de Render. No se incluyen valores reales en `render.yaml`, Postman, capturas ni commits.
+### AWS con Dokploy
 
-La colección Postman contiene un flujo completo de registro, planes, invitaciones, opciones, votos, disponibilidad, compromisos, cierre y errores. Configurar la variable `hostUrl` como `http://localhost:8080` o `https://qsale-api.onrender.com` antes de ejecutarla. Los grupos de endpoints están bajo `/api/v1`: `/auth`, `/users`, `/admin/users`, `/plans`, `/options` y `/notifications`. Dentro de cada plan se consultan participantes, opciones, disponibilidades, compromisos, viabilidad y `GET /plans/{id}/geography`. Este último devuelve el punto medio esférico y la cobertura de ubicaciones; con menos de dos usuarios unidos y ubicados, `midpoint` es `null` para no revelar una ubicación individual. Las estimaciones por alternativa se consultan en `/plans/{id}/options`.
+El despliegue configurado en `us-east-1` usa `qsale-backend` (EC2 Ubuntu 24.04, `t3.medium`, 30 GiB gp3) y `qsale-db` (RDS PostgreSQL 16, `db.t3.micro`, Single-AZ, 20 GiB gp2, acceso privado). Dokploy construye el `Dockerfile` de `main` y publica el puerto interno `8080` mediante HTTPS. RDS permite conexiones desde el grupo de seguridad de EC2.
 
-Render construye el `Dockerfile`, asigna `PORT`, conecta `DATABASE_URL` a PostgreSQL y genera `JWT_SECRET` con `render.yaml`. Después de crear una clave nueva de OpenRouteService, se agrega como `MAPS_API_KEY`; sin ella se usa Haversine a 25 km/h, que **no es tiempo de tráfico real**. La propuesta mencionaba Google Maps, pero el backend emplea OpenRouteService como equivalente. Después de crear una clave nueva de Resend, se agrega como `RESEND_API_KEY` junto con `MAIL_FROM=QSale <onboarding@resend.dev>`; el dominio de prueba solo sirve para la dirección autorizada por Resend. Tras guardar variables, redeplegar y comprobar health, login, creación de plan, estimación y mensaje recibido. La base gratuita de Render vence tras 30 días y no incluye backups; exportar los datos o migrarla antes del vencimiento.
+En **QSale → production → backend → Environment**, configura las variables de producción:
+
+```dotenv
+PORT=8080
+SPRING_DATASOURCE_URL=jdbc:postgresql://RDS_ENDPOINT:5432/qsale?sslmode=require
+DB_USER=postgres
+DB_PASSWORD=RDS_PASSWORD
+JWT_SECRET=RANDOM_SECRET
+DDL_AUTO=validate
+SHOW_SQL=false
+ADMIN_BOOTSTRAP_ENABLED=false
+SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=3
+SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=0
+JAVA_TOOL_OPTIONS="-Xms128m -Xmx512m -XX:ActiveProcessorCount=2"
+```
+
+Sustituye `RDS_ENDPOINT` y `RDS_PASSWORD` por los datos de RDS, y `RANDOM_SECRET` por una clave privada aleatoria de al menos 32 caracteres. Conserva las claves de mapas y correo en ese panel; no las copies a Postman ni a Git. Sin `MAPS_API_KEY`, el cálculo usa Haversine a 25 km/h, sin tráfico real.
+
+Para retomar el despliegue existente:
+
+1. Revisa el saldo de AWS Academy e inicia RDS y EC2 cuando necesites probar en AWS.
+2. Espera RDS **Disponible** y EC2 **En ejecución**; comprueba la IP pública de EC2.
+3. Si cambió la IP, actualiza el host `api.IP_PUBLICA.sslip.io` en **Domains**, con HTTPS y puerto `8080`.
+4. Comprueba `/actuator/health` (`UP`), Swagger y `/api/v1/users/me` sin token (`401`). Si cambió el código o el entorno, despliega `main` desde Dokploy y repite las comprobaciones.
+5. Configura `hostUrl` de Postman con la URL HTTPS vigente y prueba registro, login y el flujo de un plan.
+
+### Crédito y desconexión de Render
+
+Desarrolla el frontend contra `http://localhost:8080`. Al finalizar pruebas remotas, detén RDS y EC2, verifica ambos estados y termina el laboratorio. El almacenamiento sigue cobrando; [RDS se reinicia automáticamente tras siete días detenida](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html). Revisa la fecha de reinicio en cada sesión. El crédito de US$50 no garantiza disponibilidad continua.
+
+Render es el despliegue anterior. Retirar `render.yaml` no desconecta sus servicios: desactiva **Settings → Auto-Deploy → Off** en Render y retira el acceso de su GitHub App a **QSale**. Conserva los datos antiguos hasta comprobar si necesitas recuperarlos. Consulta [despliegues de Render](https://render.com/docs/deploys) y [acceso a repositorios](https://render.com/docs/git-provider).
 
 ## 10. Conclusión
 
 **Logros.** QSale centraliza decisiones antes dispersas y permite cerrar un plan solo con compromiso y viabilidad suficientes. La solución combina reglas de negocio, transacciones, permisos por plan, eventos y servicios externos sin convertir cada fallo de correo o mapas en una caída del flujo principal.
 
-**Aprendizajes clave.** El equipo aprendió a separar controladores, servicios y persistencia, proteger recursos por membresía y coordinar tareas externas con eventos asíncronos. También comprobó que una integración externa necesita un respaldo explícito y configuración segura.
+**Aprendizajes clave.** Separar responsabilidades, proteger recursos por membresía y coordinar eventos requiere validar también las integraciones externas.
 
-**Trabajo futuro.** Las estimaciones aproximadas no sustituyen rutas reales con tráfico. Quedan como mejoras la observabilidad, reintentos de proveedores, respaldos duraderos y una interfaz web que consuma la API; esta entrega se centra en el backend.
+**Trabajo futuro.** Antes de conectar el frontend a AWS, configura `CORS_ALLOWED_ORIGINS` con su origen HTTPS y comprueba el flujo completo con dos usuarios. Quedan como mejoras observabilidad, reintentos y respaldos duraderos.
 
 ## 11. Apéndices
 
 - [Colección Postman](postman_collection.json): solicitudes, ejemplos y variables de prueba.
 - [Migración inicial](src/main/resources/db/migration/V1__initial_schema.sql): tablas, restricciones e índices.
 - [CI](.github/workflows/ci.yml): validación automática con Maven y Testcontainers.
-- [Configuración Render](render.yaml): servicio web, PostgreSQL y variables de despliegue.
+- [Dockerfile](Dockerfile): imagen del backend desplegada con Dokploy en EC2.
 - **Licencia:** MIT, especificada en [LICENSE](LICENSE).
-- **Referencias:** [Spring Boot](https://spring.io/projects/spring-boot), [OpenRouteService](https://openrouteservice.org/), [Resend API](https://resend.com/docs/api-reference/emails/send-email) y [Render](https://render.com/docs/web-services).
+- **Referencias:** [Spring Boot](https://spring.io/projects/spring-boot), [OpenRouteService](https://openrouteservice.org/), [Resend API](https://resend.com/docs/api-reference/emails/send-email) y [Dokploy](https://docs.dokploy.com/docs/core/domains).
