@@ -52,10 +52,14 @@ class FeasibilityServiceTest {
     void planShouldBeReadyWhenEveryoneConfirmedAgreedAndIsAvailable() {
         Plan plan = buildPlan(1L, 2);
         PlanOption date = buildOption(10L, null);
+        date.setStartsOn(LocalDate.now().plusDays(10));
         when(commitmentRepository.countByPlanIdAndStatus(1L, CommitmentStatus.CONFIRMED)).thenReturn(2L);
         when(participantRepository.countByPlanIdAndStatus(1L, ParticipationStatus.JOINED)).thenReturn(2L);
         when(optionRepository.findByPlanIdAndType(1L, OptionType.DATE)).thenReturn(List.of(date));
-        when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of());
+        PlanOption place = buildOption(11L, null);
+        place.setLocation(new com.example.qsale.location.domain.Location());
+        when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of(place));
+        when(voteRepository.countByOptionId(11L)).thenReturn(2L);
         when(voteRepository.countByOptionId(10L)).thenReturn(2L);
         when(availabilityRepository.findByPlanId(1L)).thenReturn(List.of(
                 buildAvailability(plan, 100L), buildAvailability(plan, 200L)));
@@ -70,10 +74,14 @@ class FeasibilityServiceTest {
     void planShouldBeToBeDefinedWhenMinimumIsNotConfirmedYet() {
         Plan plan = buildPlan(1L, 2);
         PlanOption date = buildOption(10L, null);
+        date.setStartsOn(LocalDate.now().plusDays(10));
         when(commitmentRepository.countByPlanIdAndStatus(1L, CommitmentStatus.CONFIRMED)).thenReturn(1L);
         when(participantRepository.countByPlanIdAndStatus(1L, ParticipationStatus.JOINED)).thenReturn(2L);
         when(optionRepository.findByPlanIdAndType(1L, OptionType.DATE)).thenReturn(List.of(date));
-        when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of());
+        PlanOption place = buildOption(11L, null);
+        place.setLocation(new com.example.qsale.location.domain.Location());
+        when(optionRepository.findByPlanIdAndType(1L, OptionType.PLACE)).thenReturn(List.of(place));
+        when(voteRepository.countByOptionId(11L)).thenReturn(2L);
         when(voteRepository.countByOptionId(10L)).thenReturn(2L);
         when(availabilityRepository.findByPlanId(1L)).thenReturn(List.of(
                 buildAvailability(plan, 100L), buildAvailability(plan, 200L)));

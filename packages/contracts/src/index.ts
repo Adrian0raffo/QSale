@@ -52,6 +52,7 @@ export interface Plan {
   feasibilityStatus: FeasibilityStatus;
   feasibilityScore: number;
   minParticipants: number;
+  agreementVersion: number;
   budget: number | null;
   tentativeStartDate: string | null;
   tentativeEndDate: string | null;
@@ -97,6 +98,8 @@ export interface PlanOption {
   description: string | null;
   startsAt: string | null;
   endsAt: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
   location: Location | null;
   avgDistanceKm: number | null;
   avgTravelMinutes: number | null;
@@ -116,6 +119,8 @@ export interface OptionInput {
   description?: string;
   startsAt?: string;
   endsAt?: string;
+  startsOn?: string;
+  endsOn?: string;
   location?: Location;
 }
 
@@ -148,6 +153,66 @@ export interface Feasibility {
   confirmedParticipants: number;
   minParticipants: number;
   totalParticipants: number;
+  dateReady: boolean;
+  placeReady: boolean;
+}
+export interface DateRecommendation {
+  date: string;
+  availableParticipants: number;
+  totalParticipants: number;
+  unknownParticipants: number;
+  allParticipantsAvailable: boolean;
+  timeCompatible: boolean;
+  commonStartTime: string | null;
+  commonEndTime: string | null;
+}
+export type RescheduleStatus =
+  'VOTING' | 'APPROVED' | 'REJECTED' | 'APPLIED' | 'WITHDRAWN' | 'EXPIRED' | 'SUPERSEDED';
+export interface RescheduleInput {
+  date?: string;
+  time?: string;
+  placeOptionId?: number;
+  placeLabel?: string;
+  location?: Location;
+  reason?: string;
+  expiresAt?: string;
+}
+export interface Reschedule {
+  id: number;
+  planId: number;
+  createdById: number;
+  createdByName: string;
+  baseAgreementVersion: number;
+  date: string;
+  time: string | null;
+  endDate: string | null;
+  endTime: string | null;
+  placeOptionId: number | null;
+  placeLabel: string;
+  location: Location;
+  reason: string | null;
+  status: RescheduleStatus;
+  yesVotes: number;
+  noVotes: number;
+  totalVoters: number;
+  requiredVotes: number;
+  myVote: boolean | null;
+  canApply: boolean;
+  canWithdraw: boolean;
+  createdAt: string;
+  expiresAt: string;
+}
+export const rescheduleLabels: Record<RescheduleStatus, string> = {
+  VOTING: 'En votación',
+  APPROVED: 'Lista para aplicar',
+  REJECTED: 'Rechazada',
+  APPLIED: 'Aplicada',
+  WITHDRAWN: 'Retirada',
+  EXPIRED: 'Venció',
+  SUPERSEDED: 'Finalizada por cambio de plan',
+};
+export function isActiveReschedule(value: Reschedule) {
+  return value.status === 'VOTING' || value.status === 'APPROVED';
 }
 export interface Geography {
   midpoint: { latitude: number; longitude: number } | null;
@@ -162,7 +227,12 @@ export interface Notification {
     | 'PLAN_UPDATED'
     | 'MIN_PARTICIPANTS_REACHED'
     | 'PLAN_CLOSED'
-    | 'PLAN_CANCELLED';
+    | 'PLAN_CANCELLED'
+    | 'PLAN_REOPENED'
+    | 'ATTENDANCE_BELOW_MINIMUM'
+    | 'RESCHEDULE_PROPOSED'
+    | 'RESCHEDULE_REJECTED'
+    | 'RESCHEDULE_APPLIED';
   message: string;
   status: 'PENDING' | 'SENT' | 'FAILED';
   createdAt: string;
@@ -277,8 +347,22 @@ export const planSchema = z
       .nonnegative('El presupuesto no puede ser negativo.')
       .nullable()
       .optional(),
-    tentativeStartDate: z.string().nullable().optional(),
-    tentativeEndDate: z.string().nullable().optional(),
+    tentativeStartDate: z
+      .string()
+      .refine(
+        (value) => validDay(value) && value >= todayInLima(),
+        'Elige hoy o una fecha futura válida.',
+      )
+      .nullable()
+      .optional(),
+    tentativeEndDate: z
+      .string()
+      .refine(
+        (value) => validDay(value) && value >= todayInLima(),
+        'Elige hoy o una fecha futura válida.',
+      )
+      .nullable()
+      .optional(),
   })
   .refine(
     (value) =>
@@ -317,11 +401,16 @@ export function formatDate(value: string | null | undefined, withTime = false) {
 }
 
 export function canManagePlan(plan: Plan, user: User | null) {
+  return plan.status === 'OPEN' && isOrganizer(plan, user);
+}
+export function isOrganizer(plan: Plan, user: User | null) {
   return (
-    plan.status === 'OPEN' &&
-    (user?.role === 'ADMIN' ||
-      (plan.currentUserRole === 'ORGANIZER' && plan.currentUserParticipationStatus === 'JOINED'))
+    user?.role === 'ADMIN' ||
+    (plan.currentUserRole === 'ORGANIZER' && plan.currentUserParticipationStatus === 'JOINED')
   );
+}
+export function canRespond(plan: Plan) {
+  return plan.status !== 'CANCELLED' && plan.currentUserParticipationStatus === 'JOINED';
 }
 
 export function canContribute(plan: Plan) {
@@ -335,4 +424,89 @@ export function safeReturnPath(value: unknown, fallback = '/plans') {
     )
     ? value
     : fallback;
+}
+
+export function todayInLima() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+export function validDay(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + 'T12:00:00Z');
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+export function dateInputError(day: string, time = '', endDay = '', endTime = '') {
+  if (!validDay(day) || day < todayInLima()) return 'Elige hoy o un día futuro válido.';
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))
+    return 'Usa una hora válida con formato HH:mm.';
+  if (time && new Date(day + 'T' + time + '-05:00').getTime() <= Date.now())
+    return 'La hora de inicio debe ser futura, o puedes dejarla vacía.';
+  if (endDay && (!validDay(endDay) || endDay < day))
+    return 'El día final debe ser igual o posterior al inicial.';
+  if (endTime && (!endDay || !time || !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)))
+    return 'Para indicar una hora final, completa el día final y la hora inicial.';
+  if (endTime && endDay + 'T' + endTime <= day + 'T' + time)
+    return 'El final debe ser posterior al inicio.';
+  return '';
+}
+export function dateOptionInput(
+  day: string,
+  time = '',
+  endDay = '',
+  endTime = '',
+): Pick<OptionInput, 'startsOn' | 'startsAt' | 'endsOn' | 'endsAt'> {
+  return {
+    startsOn: day,
+    ...(time ? { startsAt: day + 'T' + time } : {}),
+    ...(endDay ? { endsOn: endDay } : {}),
+    ...(endTime ? { endsAt: endDay + 'T' + endTime } : {}),
+  };
+}
+export function formatOptionDate(option: PlanOption) {
+  const start = option.startsAt
+    ? formatDate(option.startsAt, true)
+    : formatDate(option.startsOn) + ' · Hora por acordar';
+  const end = option.endsAt
+    ? formatDate(option.endsAt, true)
+    : option.endsOn
+      ? formatDate(option.endsOn)
+      : '';
+  return start + (end ? ' – ' + end : '');
+}
+export function recommendationText(value: DateRecommendation) {
+  const coverage = `${value.availableParticipants} de ${value.totalParticipants} disponibles`;
+  const missing = value.unknownParticipants
+    ? ` · ${value.unknownParticipants} sin disponibilidad registrada`
+    : '';
+  const hours = !value.timeCompatible
+    ? ' · Sin horario común'
+    : value.commonStartTime
+      ? ` · Coinciden de ${value.commonStartTime.slice(0, 5)} a ${value.commonEndTime?.slice(0, 5) ?? 'fin del día'}`
+      : ' · Hora por acordar';
+  return coverage + missing + hours;
+}
+
+export function attendanceSummary(confirmed: number, minimum: number) {
+  return `${confirmed} ${confirmed === 1 ? 'asistente confirmado' : 'asistentes confirmados'} · Mínimo ${minimum}`;
+}
+
+export function planProgressLabel(plan: Plan) {
+  return plan.status === 'CLOSED'
+    ? 'Acuerdo confirmado. Revisa la asistencia.'
+    : plan.status === 'CANCELLED'
+      ? 'Plan cancelado. Consulta el historial.'
+      : feasibilityLabels[plan.feasibilityStatus];
+}
+
+export function rescheduleDateText(value: Reschedule) {
+  return (
+    `${formatDate(value.date)} · ${value.time?.slice(0, 5) ?? 'Hora por acordar'}` +
+    (value.endDate
+      ? ` – ${formatDate(value.endDate)}${value.endTime ? ' · ' + value.endTime.slice(0, 5) : ''}`
+      : '')
+  );
 }

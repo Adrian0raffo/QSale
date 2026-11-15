@@ -30,4 +30,5 @@ public class PlanResponseDto {
     private LocalDateTime createdAt;
     private ParticipantRole currentUserRole;
     private ParticipationStatus currentUserParticipationStatus;
+    private int agreementVersion;
 }

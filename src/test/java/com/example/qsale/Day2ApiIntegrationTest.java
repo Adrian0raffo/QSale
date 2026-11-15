@@ -365,6 +365,10 @@ class Day2ApiIntegrationTest extends AbstractContainerBaseTest {
 
         mockMvc.perform(patch("/api/v1/plans/{planId}/cancel", planId)
                         .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+        mockMvc.perform(patch("/api/v1/plans/{planId}/cancel", planId)
+                        .header("Authorization", bearer(token)))
                 .andExpect(status().isConflict());
 
         mockMvc.perform(get("/api/v1/notifications")

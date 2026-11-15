@@ -53,7 +53,8 @@ class PlanServiceTest {
     @BeforeEach
     void setUp() {
         planService = new PlanService(planRepository, participantRepository, planAccessService, feasibilityService,
-                planOptionService, userService, modelMapper, eventPublisher);
+                planOptionService, userService, modelMapper, eventPublisher,
+                org.mockito.Mockito.mock(com.example.qsale.commitment.infrastructure.CommitmentResponseRepository.class));
     }
 
     @Test
@@ -91,7 +92,7 @@ class PlanServiceTest {
         plan.setId(1L);
         plan.setStatus(PlanStatus.OPEN);
         when(userService.getCurrentUser()).thenReturn(new User());
-        when(planAccessService.getPlanAsOrganizer(any(), any())).thenReturn(plan);
+        when(planAccessService.lockAsOrganizer(any(), any())).thenReturn(plan);
         doAnswer(invocation -> {
             plan.setFeasibilityScore(80);
             plan.setFeasibilityStatus(FeasibilityStatus.READY_TO_CLOSE);
@@ -113,7 +114,7 @@ class PlanServiceTest {
         plan.setStatus(PlanStatus.OPEN);
         plan.setFeasibilityStatus(FeasibilityStatus.NOT_VIABLE);
         when(userService.getCurrentUser()).thenReturn(new User());
-        when(planAccessService.getPlanAsOrganizer(any(), any())).thenReturn(plan);
+        when(planAccessService.lockAsOrganizer(any(), any())).thenReturn(plan);
 
         assertThrows(InvalidOperationException.class, () -> planService.closePlan(1L));
 

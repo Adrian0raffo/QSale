@@ -15,6 +15,6 @@ public class CommitmentRequestDto {
     @NotNull
     private CommitmentStatus status;
 
-    @Size(max = 255)
+    @Size(max = 500)
     private String note;
 }

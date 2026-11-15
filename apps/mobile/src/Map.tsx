@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import * as DeviceLocation from 'expo-location';
 import type { Location } from '@qsale/contracts';
 import { Button, Field, Text, styles } from './ui';
+import { buildMapDocument } from './map-document';
 
 export interface MapPoint {
   latitude: number;
@@ -21,13 +22,10 @@ export function MapView({
   onChange?: (location: Location) => void;
 }) {
   const [error, setError] = useState(false);
-  const html = useMemo(() => {
-    const serialized = JSON.stringify([
-      ...points,
-      ...(value ? [{ ...value, label: 'Ubicación elegida' }] : []),
-    ]).replaceAll('<', '\\u003c');
-    return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{height:100%;margin:0}body{background:#eeece6;font-family:sans-serif}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>const points=${serialized};const map=L.map('map',{scrollWheelZoom:false}).setView([-12.115,-77.025],12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19}).addTo(map);points.forEach(p=>{const text=document.createElement('span');text.textContent=p.label;L.circleMarker([p.latitude,p.longitude],{radius:8,color:p.midpoint?'#16644a':'#C64B08',fillOpacity:1}).bindPopup(text).addTo(map)});if(points.length)map.fitBounds(L.latLngBounds(points.map(p=>[p.latitude,p.longitude])),{padding:[35,35],maxZoom:14});${onChange ? "map.on('click',e=>window.ReactNativeWebView.postMessage(JSON.stringify({latitude:e.latlng.lat,longitude:e.latlng.lng})))" : ''}</script></body></html>`;
-  }, [JSON.stringify(points), JSON.stringify(value), Boolean(onChange)]);
+  const html = useMemo(
+    () => buildMapDocument(points, value, Boolean(onChange)),
+    [JSON.stringify(points), JSON.stringify(value), Boolean(onChange)],
+  );
   if (Platform.OS === 'web')
     return (
       <View style={styles.note}>
@@ -57,9 +55,14 @@ export function MapView({
   return (
     <View>
       {error ? (
-        <Text style={styles.error}>
-          No pudimos cargar el mapa. Revisa tu conexión o usa las coordenadas.
-        </Text>
+        <View style={styles.note}>
+          <Text accessibilityRole="alert" style={styles.error}>
+            No pudimos cargar el mapa. Revisa tu conexión o usa las coordenadas.
+          </Text>
+          <Button variant="secondary" onPress={() => setError(false)}>
+            Reintentar mapa
+          </Button>
+        </View>
       ) : (
         <View style={styles.map}>
           <WebView
@@ -72,6 +75,10 @@ export function MapView({
             onMessage={(event) => {
               try {
                 const point = JSON.parse(event.nativeEvent.data);
+                if (point.error === 'map-load') {
+                  setError(true);
+                  return;
+                }
                 if (
                   typeof point.latitude === 'number' &&
                   Math.abs(point.latitude) <= 90 &&

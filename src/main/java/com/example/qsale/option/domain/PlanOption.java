@@ -29,6 +29,7 @@ import org.hibernate.annotations.OptimisticLock;
 import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +71,10 @@ public class PlanOption {
 
     private LocalDateTime endsAt;
 
+    private LocalDate startsOn;
+
+    private LocalDate endsOn;
+
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Location location;
 
@@ -97,4 +102,18 @@ public class PlanOption {
 
     @OneToMany(mappedBy = "option", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Vote> votes = new ArrayList<>();
+
+    public boolean isUpcoming(java.time.ZoneId zone) {
+        LocalDate day = getEffectiveDate();
+        return day != null && !day.isBefore(LocalDate.now(zone)) &&
+                (startsAt == null || startsAt.atZone(zone).toInstant().isAfter(Instant.now()));
+    }
+
+    public LocalDate getEffectiveDate() {
+        return startsOn != null ? startsOn : startsAt == null ? null : startsAt.toLocalDate();
+    }
+
+    public LocalDate getEffectiveEndDate() {
+        return endsOn != null ? endsOn : endsAt == null ? null : endsAt.toLocalDate();
+    }
 }

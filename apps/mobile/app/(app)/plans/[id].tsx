@@ -5,6 +5,12 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import QRCode from 'react-native-qrcode-svg';
 import {
   canContribute,
+  attendanceSummary,
+  canRespond,
+  isOrganizer,
+  formatOptionDate,
+  validDay,
+  todayInLima,
   canManagePlan,
   commitmentLabels,
   feasibilityLabels,
@@ -15,6 +21,7 @@ import {
   type CommitmentStatus,
   type PlanOption,
 } from '@qsale/contracts';
+import { DateRecommendations, ReschedulePanel } from '../../../src/Coordination';
 import { DateField } from '../../../src/DateField';
 import { api, useSession } from '../../../src/session';
 import { MapView, type MapPoint } from '../../../src/Map';
@@ -87,8 +94,8 @@ function AvailabilityForm({ planId }: { planId: number }) {
         busy={save.isPending}
         onPress={() => {
           setError('');
-          const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today) {
+          const today = todayInLima();
+          if (!validDay(date) || date < today) {
             setError('Elige hoy o una fecha futura con el formato indicado.');
             return;
           }
@@ -130,22 +137,26 @@ export default function PlanDetail() {
   const query = useQuery({
     queryKey: ['plan', planId],
     queryFn: ({ signal }) => api.plan(planId, signal),
+    refetchInterval: 8000,
     enabled: valid,
   });
   const enabled = Boolean(query.data);
   const participants = useQuery({
     queryKey: ['participants', planId],
     queryFn: ({ signal }) => api.participants(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const commitments = useQuery({
     queryKey: ['commitments', planId],
     queryFn: ({ signal }) => api.commitments(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const feasibility = useQuery({
     queryKey: ['feasibility', planId],
     queryFn: ({ signal }) => api.feasibility(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const options = useQuery({
@@ -153,11 +164,12 @@ export default function PlanDetail() {
     queryFn: ({ signal }) => api.options(planId, signal),
     enabled,
     refetchInterval: (query) =>
-      query.state.data?.some((item) => item.estimateStatus === 'PENDING') ? 4000 : false,
+      query.state.data?.some((item) => item.estimateStatus === 'PENDING') ? 4000 : 8000,
   });
   const availability = useQuery({
     queryKey: ['availabilities', planId],
     queryFn: ({ signal }) => api.availabilities(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const geography = useQuery({
@@ -197,6 +209,8 @@ export default function PlanDetail() {
   const plan = query.data,
     manage = canManagePlan(plan, user),
     contribute = canContribute(plan),
+    respondable = canRespond(plan),
+    organizer = isOrganizer(plan, user),
     mine = commitments.data?.find((item) => item.userId === user!.id);
   const link =
     (process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, '') ?? 'qsale:/') + '/join/' + plan.inviteCode;
@@ -209,7 +223,7 @@ export default function PlanDetail() {
     confirmAction(title, description, () =>
       change.mutate(action, {
         onSuccess: () => {
-          if (leave) router.replace('/');
+          if (leave) router.dismissTo('/');
         },
       }),
     );
@@ -291,39 +305,72 @@ export default function PlanDetail() {
           </Button>
         </View>
       )}
+      {plan.status === 'CLOSED' && (
+        <View style={styles.surface}>
+          <Text style={styles.heading}>Acuerdo vigente</Text>
+          {options.data
+            ?.filter((option) => option.selected)
+            .map((option) => (
+              <Text style={styles.subheading} key={option.id}>
+                {option.type === 'DATE' ? formatOptionDate(option) : option.label}
+              </Text>
+            ))}
+          <Text>
+            Si alguien no puede asistir, el día y el lugar se conservan. Solo quien organiza puede
+            aplicar una reprogramación aprobada o reabrir el plan.
+          </Text>
+        </View>
+      )}
       <View style={styles.surface}>
         <Text style={styles.heading}>¿Sale o no sale?</Text>
         <Section query={feasibility}>
-          {(value) => (
-            <>
-              <Badge good={value.status === 'READY_TO_CLOSE'}>
-                {feasibilityLabels[value.status]}
-              </Badge>
-              <Text style={styles.subtitle}>
-                {value.confirmedParticipants} de {value.minParticipants} confirmaciones mínimas ·
-                Viabilidad {value.score}%
-              </Text>
-              <View
-                accessibilityRole="progressbar"
-                accessibilityValue={{ min: 0, max: 100, now: value.score }}
-                style={{
-                  height: 6,
-                  borderRadius: 4,
-                  backgroundColor: '#EEE7DA',
-                  overflow: 'hidden',
-                }}
-              >
+          {(value) =>
+            plan.status === 'CLOSED' ? (
+              <>
+                <Text style={styles.subheading}>
+                  {attendanceSummary(value.confirmedParticipants, value.minParticipants)}
+                </Text>
+                <Text>
+                  {value.confirmedParticipants < value.minParticipants
+                    ? 'Ya no se alcanza el mínimo. El acuerdo se conserva; quien organiza puede reabrirlo o cancelarlo.'
+                    : 'El acuerdo sigue vigente.'}
+                </Text>
+              </>
+            ) : plan.status === 'CANCELLED' ? (
+              <Text>Plan cancelado; disponible para consulta.</Text>
+            ) : (
+              <>
+                <Badge good={value.status === 'READY_TO_CLOSE'}>
+                  {feasibilityLabels[value.status]}
+                </Badge>
+                <Text style={styles.subtitle}>
+                  {value.confirmedParticipants} de {value.minParticipants} confirmaciones mínimas ·
+                  Viabilidad {value.score}%
+                </Text>
                 <View
-                  style={{ height: 6, width: `${value.score}%`, backgroundColor: colors.accent }}
-                />
-              </View>
-              <Text style={styles.muted}>
-                La viabilidad también considera propuestas, votos y disponibilidad.
-              </Text>
-            </>
-          )}
+                  accessibilityRole="progressbar"
+                  accessibilityValue={{ min: 0, max: 100, now: value.score }}
+                  style={{
+                    height: 6,
+                    borderRadius: 4,
+                    backgroundColor: '#EEE7DA',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View
+                    style={{ height: 6, width: `${value.score}%`, backgroundColor: colors.accent }}
+                  />
+                </View>
+                <Text style={styles.muted}>
+                  La viabilidad también considera propuestas, votos y disponibilidad.
+                </Text>
+                {!value.dateReady && <Text>Falta una fecha vigente con votos.</Text>}
+                {!value.placeReady && <Text>Falta un lugar con votos.</Text>}
+              </>
+            )
+          }
         </Section>
-        {contribute ? (
+        {respondable ? (
           <>
             <Text style={styles.subheading}>¿Cuentan contigo?</Text>
             <View style={{ gap: 9 }}>
@@ -389,6 +436,7 @@ export default function PlanDetail() {
               Proponer
             </Button>
           )}
+          <ReschedulePanel plan={plan} options={options.data ?? []} />
           <Section query={options}>
             {(items) =>
               items.length ? (
@@ -406,8 +454,7 @@ export default function PlanDetail() {
                     )}
                     <Text>
                       {option.type === 'DATE'
-                        ? formatDate(option.startsAt, true) +
-                          (option.endsAt ? ' – ' + formatDate(option.endsAt, true) : '')
+                        ? formatOptionDate(option)
                         : (option.location?.address ?? 'Ubicación en el mapa')}
                     </Text>
                     {option.type === 'PLACE' && (
@@ -525,6 +572,14 @@ export default function PlanDetail() {
                           ]
                         : 'Sin respuesta'}
                   </Text>
+                  {Boolean(
+                    commitments.data?.find((response) => response.userId === item.userId)?.note,
+                  ) && (
+                    <Text style={styles.muted}>
+                      Nota:{' '}
+                      {commitments.data?.find((response) => response.userId === item.userId)?.note}
+                    </Text>
+                  )}
                   {plan.status === 'OPEN' &&
                     item.role !== 'ORGANIZER' &&
                     (manage || item.userId === user!.id) && (
@@ -560,7 +615,8 @@ export default function PlanDetail() {
             title="Encuentren un momento en común"
             description="La disponibilidad ayuda a la viabilidad; no sustituye tu confirmación de asistencia."
           />
-          {contribute && <AvailabilityForm planId={planId} />}
+          {respondable && <AvailabilityForm planId={planId} />}
+          <DateRecommendations planId={planId} />
           <Section query={availability}>
             {(items) =>
               items.length ? (
@@ -573,7 +629,7 @@ export default function PlanDetail() {
                         ? item.startTime.slice(0, 5) + '–' + item.endTime?.slice(0, 5)
                         : 'Todo el día'}
                     </Text>
-                    {contribute && item.userId === user!.id && (
+                    {respondable && item.userId === user!.id && (
                       <Button
                         variant="quiet"
                         disabled={change.isPending}
@@ -627,6 +683,37 @@ export default function PlanDetail() {
           </Section>
         </>
       )}
+      {organizer && plan.status === 'CLOSED' && (
+        <View style={styles.surface}>
+          <Text style={styles.subheading}>Para quien organiza</Text>
+          <Button
+            variant="secondary"
+            disabled={change.isPending}
+            onPress={() =>
+              request(
+                '¿Reabrir el plan?',
+                'Se conservarán las opciones y los votos, pero las asistencias confirmadas pasarán a pendientes para decidir un nuevo acuerdo. Las reprogramaciones activas quedarán reemplazadas.',
+                () => api.reopenPlan(planId),
+              )
+            }
+          >
+            Reabrir para decidir de nuevo
+          </Button>
+          <Button
+            variant="quiet"
+            disabled={change.isPending}
+            onPress={() =>
+              request(
+                '¿Cancelar este plan?',
+                'El grupo recibirá un aviso y conservará el historial.',
+                () => api.cancelPlan(planId),
+              )
+            }
+          >
+            Cancelar plan
+          </Button>
+        </View>
+      )}
       {manage && (
         <View style={styles.surface}>
           <Text style={styles.subheading}>Para quien organiza</Text>
@@ -636,7 +723,7 @@ export default function PlanDetail() {
             onPress={() =>
               request(
                 '¿Confirmar el plan?',
-                'Se elegirán las propuestas más votadas y se notificará al grupo. Ya no podrán cambiar las respuestas.',
+                'Se fijarán el día y el lugar más votados. La hora es opcional. Cada integrante podrá actualizar su asistencia sin cambiar el acuerdo.',
                 () => api.closePlan(planId),
               )
             }

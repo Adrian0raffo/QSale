@@ -18,6 +18,14 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import {
   canContribute,
+  attendanceSummary,
+  canRespond,
+  isOrganizer,
+  dateInputError,
+  dateOptionInput,
+  formatOptionDate,
+  validDay,
+  todayInLima,
   canManagePlan,
   commitmentLabels,
   formatDate,
@@ -32,6 +40,7 @@ import {
   type PlanDetail as Plan,
   type PlanOption,
 } from '@qsale/contracts';
+import { DateRecommendations, ReschedulePanel } from '../Coordination';
 import { api, useSession } from '../session';
 import { useAction } from '../hooks';
 import {
@@ -74,12 +83,14 @@ function DataSection<T>({
 export function ParticipantRow({
   item,
   commitment,
+  note,
   canRemove,
   onRemove,
   busy,
 }: {
   item: Participant;
   commitment?: CommitmentStatus;
+  note?: string | null;
   canRemove: boolean;
   onRemove: () => void;
   busy: boolean;
@@ -96,6 +107,7 @@ export function ParticipantRow({
               ? 'Invitación pendiente'
               : 'Parte del grupo'}
         </small>
+        {note && <small>Nota: {note}</small>}
       </div>
       <span className={'participant-response ' + (commitment ?? '')}>
         {item.status === 'INVITED'
@@ -146,10 +158,7 @@ export function OptionCard({
       </div>
       {option.description && <p>{option.description}</p>}
       {option.type === 'DATE' ? (
-        <p className="option-main">
-          {formatDate(option.startsAt, true)}
-          {option.endsAt && ' – ' + formatDate(option.endsAt, true)}
-        </p>
+        <p className="option-main">{formatOptionDate(option)}</p>
       ) : (
         <>
           <p className="option-main">{option.location?.address ?? 'Ubicación en el mapa'}</p>
@@ -213,6 +222,8 @@ function OptionForm({ planId, onClose }: { planId: number; onClose: () => void }
   const [description, setDescription] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [location, setLocation] = useState<Location | null>(null);
   const [error, setError] = useState('');
   const action = useAction(
@@ -231,12 +242,9 @@ function OptionForm({ planId, onClose }: { planId: number; onClose: () => void }
           setError('El título necesita entre 3 y 120 caracteres.');
           return;
         }
-        if (type === 'DATE' && (!start || new Date(start + '-05:00').getTime() <= Date.now())) {
-          setError('Elige una fecha y hora futuras.');
-          return;
-        }
-        if (type === 'DATE' && end && end < start) {
-          setError('El final debe ser posterior al inicio.');
+        const dateError = dateInputError(start, startTime, end, endTime);
+        if (type === 'DATE' && dateError) {
+          setError(dateError);
           return;
         }
         if (type === 'PLACE' && !locationSchema.safeParse(location).success) {
@@ -248,7 +256,7 @@ function OptionForm({ planId, onClose }: { planId: number; onClose: () => void }
           label: label.trim(),
           description,
           ...(type === 'DATE'
-            ? { startsAt: start, ...(end ? { endsAt: end } : {}) }
+            ? dateOptionInput(start, startTime, end, endTime)
             : { location: location! }),
         });
       }}
@@ -282,14 +290,26 @@ function OptionForm({ planId, onClose }: { planId: number; onClose: () => void }
       {type === 'DATE' ? (
         <div className="form-row">
           <Field
-            label="Inicio (hora de Lima)"
-            type="datetime-local"
+            label="Día de inicio"
+            type="date"
             value={start}
             onChange={(event) => setStart(event.target.value)}
           />
           <Field
-            label="Final (opcional)"
-            type="datetime-local"
+            label="Hora de inicio (Lima, opcional)"
+            type="time"
+            value={startTime}
+            onChange={(event) => setStartTime(event.target.value)}
+          />
+          <Field
+            label="Hora final (opcional)"
+            type="time"
+            value={endTime}
+            onChange={(event) => setEndTime(event.target.value)}
+          />
+          <Field
+            label="Día final (opcional)"
+            type="date"
             value={end}
             onChange={(event) => setEnd(event.target.value)}
           />
@@ -332,8 +352,8 @@ function AvailabilityForm({ planId }: { planId: number }) {
       onSubmit={(event) => {
         event.preventDefault();
         setError('');
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-        if (!date || date < today) {
+        const today = todayInLima();
+        if (!validDay(date) || date < today) {
           setError('Elige hoy o una fecha futura.');
           return;
         }
@@ -403,22 +423,26 @@ export default function PlanDetail() {
   const query = useQuery({
     queryKey: ['plan', planId],
     queryFn: ({ signal }) => api.plan(planId, signal),
+    refetchInterval: 8000,
     enabled: valid,
   });
   const enabled = Boolean(query.data);
   const participants = useQuery({
     queryKey: ['participants', planId],
     queryFn: ({ signal }) => api.participants(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const commitments = useQuery({
     queryKey: ['commitments', planId],
     queryFn: ({ signal }) => api.commitments(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const feasibility = useQuery({
     queryKey: ['feasibility', planId],
     queryFn: ({ signal }) => api.feasibility(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const options = useQuery({
@@ -426,11 +450,12 @@ export default function PlanDetail() {
     queryFn: ({ signal }) => api.options(planId, signal),
     enabled,
     refetchInterval: (query) =>
-      query.state.data?.some((option) => option.estimateStatus === 'PENDING') ? 4000 : false,
+      query.state.data?.some((option) => option.estimateStatus === 'PENDING') ? 4000 : 8000,
   });
   const availability = useQuery({
     queryKey: ['availabilities', planId],
     queryFn: ({ signal }) => api.availabilities(planId, signal),
+    refetchInterval: 8000,
     enabled,
   });
   const geography = useQuery({
@@ -469,6 +494,8 @@ export default function PlanDetail() {
   const plan = query.data;
   const manage = canManagePlan(plan, user);
   const contribute = canContribute(plan);
+  const respondable = canRespond(plan);
+  const organizer = isOrganizer(plan, user);
   const selectedTab = params.get('tab') ?? 'proposals';
   const tab = ['proposals', 'group', 'availability', 'map'].includes(selectedTab)
     ? selectedTab
@@ -540,6 +567,22 @@ export default function PlanDetail() {
           </Button>
         </section>
       )}
+      {plan.status === 'CLOSED' && (
+        <section className="inline-form" aria-label="Acuerdo vigente">
+          <h2>Acuerdo vigente</h2>
+          {options.data
+            ?.filter((option) => option.selected)
+            .map((option) => (
+              <p key={option.id}>
+                <strong>{option.type === 'DATE' ? formatOptionDate(option) : option.label}</strong>
+              </p>
+            ))}
+          <p>
+            Si alguien no puede asistir, el día y el lugar se conservan. Solo quien organiza puede
+            aplicar una reprogramación aprobada o reabrir el plan.
+          </p>
+        </section>
+      )}
       <div className="detail-layout">
         <div className="detail-main">
           <nav className="detail-tabs" aria-label="Secciones del plan">
@@ -578,6 +621,7 @@ export default function PlanDetail() {
                 {propose && contribute && (
                   <OptionForm planId={planId} onClose={() => setPropose(false)} />
                 )}
+                <ReschedulePanel plan={plan} options={options.data ?? []} />
                 <DataSection query={options}>
                   {(items) =>
                     items.length ? (
@@ -654,6 +698,10 @@ export default function PlanDetail() {
                             commitments.data?.find((response) => response.userId === item.userId)
                               ?.status
                           }
+                          note={
+                            commitments.data?.find((response) => response.userId === item.userId)
+                              ?.note
+                          }
                           canRemove={
                             plan.status === 'OPEN' &&
                             item.role !== 'ORGANIZER' &&
@@ -687,7 +735,8 @@ export default function PlanDetail() {
               <>
                 <h2>Encuentren un momento en común</h2>
                 <p>Las horas se muestran en hora de Lima.</p>
-                {contribute && <AvailabilityForm planId={planId} />}
+                {respondable && <AvailabilityForm planId={planId} />}
+                <DateRecommendations planId={planId} />
                 <DataSection query={availability}>
                   {(items) =>
                     items.length ? (
@@ -704,7 +753,7 @@ export default function PlanDetail() {
                                   : 'Todo el día'}
                               </p>
                             </div>
-                            {contribute && item.userId === user!.id && (
+                            {respondable && item.userId === user!.id && (
                               <Button
                                 variant="quiet"
                                 aria-label="Eliminar mi disponibilidad"
@@ -765,9 +814,30 @@ export default function PlanDetail() {
           <section className="decision-panel">
             <h2>¿Sale o no sale?</h2>
             <DataSection query={feasibility}>
-              {(value) => <FeasibilityIndicator value={value} />}
+              {(value) =>
+                plan.status === 'CLOSED' ? (
+                  <div role="status">
+                    <strong>
+                      {attendanceSummary(value.confirmedParticipants, value.minParticipants)}
+                    </strong>
+                    <p>
+                      {value.confirmedParticipants < value.minParticipants
+                        ? 'Ya no se alcanza el mínimo. El acuerdo se conserva; quien organiza puede reabrirlo o cancelarlo.'
+                        : 'El acuerdo sigue vigente.'}
+                    </p>
+                  </div>
+                ) : plan.status === 'CANCELLED' ? (
+                  <p>Plan cancelado; disponible para consulta.</p>
+                ) : (
+                  <>
+                    <FeasibilityIndicator value={value} />
+                    {!value.dateReady && <p>Falta una fecha vigente con votos.</p>}
+                    {!value.placeReady && <p>Falta un lugar con votos.</p>}
+                  </>
+                )
+              }
             </DataSection>
-            {contribute ? (
+            {respondable ? (
               <>
                 <h3>¿Cuentan contigo?</h3>
                 <div className="commitment-buttons">
@@ -804,6 +874,39 @@ export default function PlanDetail() {
                     : 'Acepta la invitación para responder si vas.'}
               </p>
             )}
+            {organizer && plan.status === 'CLOSED' && (
+              <div className="organizer-actions">
+                <h3>Para quien organiza</h3>
+                <Button
+                  variant="secondary"
+                  disabled={destructive.isPending}
+                  onClick={() =>
+                    request(
+                      '¿Reabrir el plan?',
+                      'Se conservarán las opciones y los votos, pero las asistencias confirmadas pasarán a pendientes para decidir un nuevo acuerdo. Las propuestas de reprogramación activas quedarán reemplazadas.',
+                      'Reabrir plan',
+                      () => api.reopenPlan(planId),
+                    )
+                  }
+                >
+                  Reabrir para decidir de nuevo
+                </Button>
+                <Button
+                  variant="quiet"
+                  disabled={destructive.isPending}
+                  onClick={() =>
+                    request(
+                      '¿Cancelar este plan?',
+                      'El grupo recibirá un aviso y conservará el historial.',
+                      'Cancelar plan',
+                      () => api.cancelPlan(planId),
+                    )
+                  }
+                >
+                  Cancelar plan
+                </Button>
+              </div>
+            )}
             {manage && (
               <div className="organizer-actions">
                 <h3>Para quien organiza</h3>
@@ -812,7 +915,7 @@ export default function PlanDetail() {
                   onClick={() =>
                     request(
                       '¿Confirmar el plan?',
-                      'Se elegirán las propuestas más votadas de fecha y lugar, y el grupo recibirá una notificación. Ya no podrán cambiar las respuestas.',
+                      'Se fijarán el día y el lugar más votados. La hora es opcional. Cada integrante podrá actualizar su asistencia sin cambiar el acuerdo.',
                       'Confirmar plan',
                       () => api.closePlan(planId),
                     )

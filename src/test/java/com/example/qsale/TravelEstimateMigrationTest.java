@@ -29,8 +29,9 @@ class TravelEstimateMigrationTest extends AbstractContainerBaseTest {
                 statement.executeUpdate("INSERT INTO plan_options (id, label, selected, type, version, plan_id, "
                         + "proposed_by_id, location_id, avg_distance_km, avg_travel_minutes) "
                         + "VALUES (1, 'Existing place', false, 'PLACE', 0, 1, 1, 1, 4.5, 12)");
-                statement.executeUpdate("INSERT INTO plan_options (id, label, selected, type, version, plan_id, proposed_by_id) "
-                        + "VALUES (2, 'Existing date', false, 'DATE', 0, 1, 1)");
+                statement.executeUpdate("INSERT INTO plan_options (id, label, selected, type, version, plan_id, proposed_by_id, starts_at, ends_at) "
+                        + "VALUES (2, 'Existing date', false, 'DATE', 0, 1, 1, '2027-02-01 18:30:00', '2027-02-02 12:00:00')");
+                statement.executeUpdate("UPDATE plans SET status = 'CLOSED' WHERE id = 1");
             }
         }
         Flyway.configure().dataSource(url, username, password).schemas(schema).defaultSchema(schema).load().migrate();
@@ -46,7 +47,15 @@ class TravelEstimateMigrationTest extends AbstractContainerBaseTest {
                 assertNull(result.getTimestamp("estimate_updated_at"));
                 assertTrue(result.next());
                 assertEquals("NOT_APPLICABLE", result.getString("estimate_status"));
+                assertEquals("2027-02-01", result.getDate("starts_on").toString());
+                assertEquals("2027-02-02", result.getDate("ends_on").toString());
+                assertEquals("18:30", result.getTimestamp("starts_at").toLocalDateTime().toLocalTime().toString());
                 assertFalse(result.next());
+            }
+            try (var statement = connection.createStatement();
+                 var result = statement.executeQuery("SELECT agreement_version FROM plans WHERE id = 1")) {
+                assertTrue(result.next());
+                assertEquals(1, result.getInt(1));
             }
         }
     }

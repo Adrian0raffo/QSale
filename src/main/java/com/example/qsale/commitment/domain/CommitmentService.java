@@ -6,6 +6,9 @@ import com.example.qsale.commitment.infrastructure.CommitmentResponseRepository;
 import com.example.qsale.participant.domain.ParticipantService;
 import com.example.qsale.plan.domain.Plan;
 import com.example.qsale.plan.domain.PlanAccessService;
+import com.example.qsale.plan.domain.PlanStatus;
+import com.example.qsale.notification.domain.NotificationService;
+import com.example.qsale.notification.domain.NotificationType;
 import com.example.qsale.plan.events.PlanChangedEvent;
 import com.example.qsale.user.domain.User;
 import com.example.qsale.user.domain.UserService;
@@ -29,14 +32,16 @@ public class CommitmentService {
     private final UserService userService;
     private final ApplicationEventPublisher eventPublisher;
     private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
 
     @PreAuthorize("@planAuthorization.isJoined(#planId, authentication)")
     @Transactional
     public CommitmentResponseDto respond(Long planId, CommitmentRequestDto dto) {
         User user = userService.getCurrentUser();
-        Plan plan = planAccessService.getPlanAsMember(planId, user);
-        planAccessService.requireOpen(plan);
+        Plan plan = planAccessService.lockAsMember(planId, user);
+        planAccessService.requireNotCancelled(plan);
         participantService.requireJoined(planId, user);
+        long before = commitmentRepository.countByPlanIdAndStatus(planId, CommitmentStatus.CONFIRMED);
 
         CommitmentResponse commitment = commitmentRepository.findByPlanIdAndUserId(planId, user.getId())
                 .orElseGet(() -> new CommitmentResponse(plan, user, dto.getStatus()));
@@ -44,6 +49,12 @@ public class CommitmentService {
         if (dto.getNote() != null) commitment.setNote(dto.getNote());
         commitment.setRespondedAt(LocalDateTime.now());
         commitmentRepository.save(commitment);
+        long after = commitmentRepository.countByPlanIdAndStatus(planId, CommitmentStatus.CONFIRMED);
+        if (plan.getStatus() == PlanStatus.CLOSED && before >= plan.getMinParticipants() && after < plan.getMinParticipants()) {
+            notificationService.notifyOrganizer(plan, NotificationType.ATTENDANCE_BELOW_MINIMUM,
+                    "El plan " + plan.getName() + " tiene " + after + " confirmaciones; necesita " + plan.getMinParticipants()
+                    + ". El día y lugar se conservan. Puedes invitar a alguien o proponer una reprogramación.");
+        }
         eventPublisher.publishEvent(new PlanChangedEvent(this, plan.getId()));
         return modelMapper.map(commitment, CommitmentResponseDto.class);
     }

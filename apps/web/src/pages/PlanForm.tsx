@@ -149,7 +149,7 @@ export default function PlanForm() {
             placeholder="Por definir"
             hint="Opcional. Aclara en la descripción qué incluye."
             {...register('budget', {
-              setValueAs: (value) => (value === '' ? null : Number(value)),
+              setValueAs: (value) => (value == null || value === '' ? null : Number(value)),
             })}
             error={errors.budget?.message}
           />

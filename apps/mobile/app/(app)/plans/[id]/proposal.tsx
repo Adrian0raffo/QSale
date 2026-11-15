@@ -3,7 +3,14 @@ import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '@qsale/api-client';
-import { canContribute, locationSchema, type Location, type OptionInput } from '@qsale/contracts';
+import {
+  canContribute,
+  dateInputError,
+  dateOptionInput,
+  locationSchema,
+  type Location,
+  type OptionInput,
+} from '@qsale/contracts';
 import { DateField } from '../../../../src/DateField';
 import { api } from '../../../../src/session';
 import { LocationPicker } from '../../../../src/Map';
@@ -112,11 +119,10 @@ export default function Proposal() {
               optional={false}
             />
             <DateField
-              label="Hora de inicio (Lima)"
+              label="Hora de inicio (Lima, opcional)"
               mode="time"
               value={startTime}
               onChange={setStartTime}
-              optional={false}
             />
             <DateField label="Día final (opcional)" value={endDay} onChange={setEndDay} />
             <DateField
@@ -145,23 +151,9 @@ export default function Proposal() {
               setError('Escribe un título de al menos 3 caracteres.');
               return;
             }
-            const normalized = startDay + 'T' + startTime,
-              finish = endDay || endTime ? endDay + 'T' + endTime : '';
-            if (
-              type === 'DATE' &&
-              (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized) ||
-                Number.isNaN(new Date(normalized + '-05:00').getTime()) ||
-                new Date(normalized + '-05:00').getTime() <= Date.now())
-            ) {
-              setError('Escribe una fecha y hora futuras con el formato indicado.');
-              return;
-            }
-            if (
-              type === 'DATE' &&
-              finish &&
-              (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(finish) || finish < normalized)
-            ) {
-              setError('El final debe tener el mismo formato y ser posterior al inicio.');
+            const dateError = dateInputError(startDay, startTime, endDay, endTime);
+            if (type === 'DATE' && dateError) {
+              setError(dateError);
               return;
             }
             if (type === 'PLACE' && !locationSchema.safeParse(location).success) {
@@ -173,7 +165,7 @@ export default function Proposal() {
               label: label.trim(),
               description,
               ...(type === 'DATE'
-                ? { startsAt: normalized, ...(finish ? { endsAt: finish } : {}) }
+                ? dateOptionInput(startDay, startTime, endDay, endTime)
                 : { location: location! }),
             });
           }}

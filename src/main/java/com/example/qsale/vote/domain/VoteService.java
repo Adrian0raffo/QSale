@@ -56,7 +56,7 @@ public class VoteService {
     }
 
     private Plan getOpenPlanForVoter(PlanOption option, User user) {
-        Plan plan = planAccessService.getPlanAsMember(option.getPlan().getId(), user);
+        Plan plan = planAccessService.lockAsMember(option.getPlan().getId(), user);
         planAccessService.requireOpen(plan);
         participantService.requireJoined(plan.getId(), user);
         return plan;

@@ -22,7 +22,12 @@
         "exec": [
           "const date = new Date();",
           "date.setDate(date.getDate() + 14);",
-          "pm.collectionVariables.set(\"futureDate\", date.toISOString().slice(0, 10));"
+          "pm.collectionVariables.set(\"futureDate\", date.toISOString().slice(0, 10));",
+          "const rescheduleDay = new Date();",
+          "rescheduleDay.setDate(rescheduleDay.getDate() + 15);",
+          "pm.collectionVariables.set(\"rescheduleDate\", rescheduleDay.toISOString().slice(0, 10));",
+          "rescheduleDay.setDate(rescheduleDay.getDate() + 1);",
+          "pm.collectionVariables.set(\"nextRescheduleDate\", rescheduleDay.toISOString().slice(0, 10));"
         ]
       }
     }
@@ -118,6 +123,18 @@
     },
     {
       "key": "futureDate",
+      "value": ""
+    },
+    {
+      "key": "rescheduleId",
+      "value": ""
+    },
+    {
+      "key": "rescheduleDate",
+      "value": ""
+    },
+    {
+      "key": "nextRescheduleDate",
       "value": ""
     }
   ],
@@ -1718,7 +1735,7 @@
               }
             ],
             "url": "{{baseUrl}}/plans/{{planId}}/options",
-            "description": "Cualquier miembro puede proponer. Una opción DATE exige startsAt en el futuro.",
+            "description": "Una fecha exige un día vigente (startsOn o startsAt). La hora es opcional; endsOn permite varios días. Los horarios, si se indican, son de Lima.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"type\": \"DATE\",\n  \"label\": \"Viernes 8 pm\",\n  \"startsAt\": \"{{futureDate}}T20:00:00\",\n  \"endsAt\": \"{{futureDate}}T23:00:00\"\n}",
@@ -1741,7 +1758,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/plans/{{planId}}/options",
-                "description": "Cualquier miembro puede proponer. Una opción DATE exige startsAt en el futuro.",
+                "description": "Una fecha exige un día vigente (startsOn o startsAt). La hora es opcional; endsOn permite varios días. Los horarios, si se indican, son de Lima.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"type\": \"DATE\",\n  \"label\": \"Viernes 8 pm\",\n  \"startsAt\": \"{{futureDate}}T20:00:00\",\n  \"endsAt\": \"{{futureDate}}T23:00:00\"\n}",
@@ -3707,6 +3724,294 @@
             "url": "{{baseUrl}}/notifications/page?page=-1&size=10",
             "description": "Las páginas negativas no se ejecutan ni exponen notificaciones de otros destinatarios."
           }
+        }
+      ]
+    },
+    {
+      "name": "9.6. Coordinación posterior al cierre",
+      "description": "Ejecuta después de cerrar el plan. Una baja no reabre el acuerdo; los votos sí cuentan como asistencia al aplicar el organizador. La reapertura manual pide una decisión nueva.",
+      "item": [
+        {
+          "name": "Fechas recomendadas por disponibilidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Actualizar asistencia tras confirmar (invitado)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/plans/{{planId}}/commitments/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANT_GO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{guestToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "La baja conserva el acuerdo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"El plan sigue confirmado\", () => pm.expect(pm.response.json().status).to.eql(\"CLOSED\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Proponer otro día sin imponer una hora",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{rescheduleDate}}\",\n  \"reason\": \"Otro día que funciona al grupo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code < 300) pm.collectionVariables.set(\"rescheduleId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Consultar propuestas e historial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Sí asistiría si se aplica el cambio (invitado)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/vote",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accepted\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{guestToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Aplicar reprogramación (organizador)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Propuesta aplicada\", () => pm.expect(pm.response.json().status).to.eql(\"APPLIED\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear otra propuesta para retirarla",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{nextRescheduleDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "if (pm.response.code < 300) pm.collectionVariables.set(\"rescheduleId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Retirar propuesta sin cambiar el acuerdo",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Propuesta retirada\", () => pm.expect(pm.response.json().status).to.eql(\"WITHDRAWN\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Reabrir manualmente para decidir de nuevo",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/plans/{{planId}}/reopen"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Plan abierto\", () => pm.expect(pm.response.json().status).to.eql(\"OPEN\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
         }
       ]
     },

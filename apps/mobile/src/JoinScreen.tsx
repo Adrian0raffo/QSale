@@ -83,14 +83,20 @@ export default function JoinScreen() {
           icon="camera"
           onPress={async () => {
             setError('');
-            const result = permission?.granted ? permission : await requestPermission();
-            if (result.granted) {
-              lock.current = false;
-              setCamera(true);
-            } else
+            try {
+              const result = permission?.granted ? permission : await requestPermission();
+              if (result.granted) {
+                lock.current = false;
+                setCamera(true);
+              } else
+                setError(
+                  'No se concedió acceso a la cámara. Puedes ingresar el código manualmente o habilitar el permiso en Ajustes.',
+                );
+            } catch {
               setError(
-                'No se concedió acceso a la cámara. Puedes ingresar el código manualmente o habilitar el permiso en Ajustes.',
+                'No pudimos abrir la cámara. Puedes ingresar el código de invitación manualmente.',
               );
+            }
           }}
         >
           Escanear invitación

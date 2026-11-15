@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import Feather from '@expo/vector-icons/Feather';
 import {
-  feasibilityLabels,
+  planProgressLabel,
   formatDate,
   formatMoney,
   planStatusLabels,
@@ -163,7 +163,7 @@ export default function Plans() {
                   fontFamily: 'Manrope_700Bold',
                 }}
               >
-                {feasibilityLabels[plan.feasibilityStatus]}
+                {planProgressLabel(plan)}
               </Text>
             </View>
           </Pressable>

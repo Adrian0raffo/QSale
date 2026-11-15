@@ -50,13 +50,23 @@ test('two people organize, vote, confirm and close a plan through the real API',
   await page.getByRole('button', { name: 'Propuestas', exact: true }).click();
   await page.getByRole('button', { name: 'Proponer', exact: true }).click();
   await page.getByLabel('Título de la propuesta').fill('Sábado al atardecer');
-  await page.getByLabel('Inicio (hora de Lima)').fill(futureDate + 'T17:00');
+  await page.getByLabel('Día de inicio', { exact: true }).fill(futureDate);
+  await page.getByLabel('Hora de inicio (Lima, opcional)').fill('17:00');
   await page.getByRole('button', { name: 'Publicar propuesta' }).click();
   await page.getByRole('button', { name: 'Votar', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Quitar mi voto' })).toBeVisible();
   await bob.reload();
   await bob.getByRole('button', { name: 'Votar', exact: true }).click();
   await bob.getByRole('button', { name: 'Sí, voy' }).click();
+  await page.getByRole('button', { name: 'Proponer', exact: true }).click();
+  await page.getByRole('button', { name: 'Lugar', exact: true }).click();
+  await page.getByLabel('Título de la propuesta').fill('Parque para reencontrarnos');
+  await page.getByLabel('Latitud', { exact: true }).fill('-12.12');
+  await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
+  await page.getByRole('button', { name: 'Publicar propuesta' }).click();
+  await page.getByRole('button', { name: 'Votar', exact: true }).click();
+  await bob.reload();
+  await bob.getByRole('button', { name: 'Votar', exact: true }).click();
   await page.getByLabel('Una nota para tu grupo (opcional)').fill('Llego después de clase');
   await page.getByRole('button', { name: 'Sí, voy' }).click();
   await page.reload();
@@ -78,8 +88,8 @@ test('two people organize, vote, confirm and close a plan through the real API',
   await page.screenshot({ path: testInfo.outputPath('plan-detail-desktop.png'), fullPage: true });
   await page.getByRole('button', { name: 'Confirmar y cerrar plan' }).click();
   await page.getByRole('button', { name: 'Confirmar plan', exact: true }).click();
-  await expect(page.getByText('Este plan ya está confirmado.', { exact: false })).toBeVisible();
-  await expect(page.getByText('Elegida', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Acuerdo vigente', exact: true })).toBeVisible();
+  await expect(page.getByText('Elegida', { exact: true })).toHaveCount(2);
   await page.reload();
   await expect(
     page.getByRole('heading', { name: 'Reencuentro del sábado', exact: true }),

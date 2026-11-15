@@ -90,6 +90,9 @@ public class Plan {
 
     private LocalDateTime closedAt;
 
+    @Column(nullable = false)
+    private int agreementVersion;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(nullable = false)
     private User creator;

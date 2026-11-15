@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.Instant;
 
 @Getter
@@ -21,6 +22,8 @@ public class OptionResponseDto {
     private String description;
     private LocalDateTime startsAt;
     private LocalDateTime endsAt;
+    private LocalDate startsOn;
+    private LocalDate endsOn;
     private LocationDto location;
     private Double avgDistanceKm;
     private Integer avgTravelMinutes;

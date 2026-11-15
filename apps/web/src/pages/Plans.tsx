@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, CalendarDays, Plus, Search, Ticket, UsersRound, Wallet } from 'lucide-react';
 import {
-  feasibilityLabels,
+  planProgressLabel,
   formatDate,
   formatMoney,
   planTypeLabels,
@@ -69,7 +69,7 @@ export function PlanCard({ plan }: { plan: Plan }) {
         <div className="plan-card-footer">
           <span className={'feasibility-label ' + plan.feasibilityStatus.toLowerCase()}>
             <i />
-            {feasibilityLabels[plan.feasibilityStatus]}
+            {planProgressLabel(plan)}
           </span>
           <Link className="icon-button" aria-label={'Ver ' + plan.name} to={'/plans/' + plan.id}>
             <ArrowUpRight size={21} />

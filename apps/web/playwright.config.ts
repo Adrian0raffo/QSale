@@ -15,11 +15,24 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } },
     },
   ],
-  webServer: {
-    command: 'npm run dev:web',
-    cwd: '../..',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 30000,
-  },
+  webServer: [
+    {
+      command: 'npm run dev:web',
+      cwd: '../..',
+      url: 'http://127.0.0.1:5173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 30000,
+    },
+    {
+      command: 'npx expo start --web --port 8081',
+      cwd: '../mobile',
+      url: 'http://127.0.0.1:8081',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60000,
+      env: {
+        EXPO_PUBLIC_API_URL: 'http://127.0.0.1:19080/api/v1',
+        EXPO_PUBLIC_WEB_URL: 'http://127.0.0.1:5173',
+      },
+    },
+  ],
 });
