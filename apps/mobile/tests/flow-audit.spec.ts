@@ -40,9 +40,14 @@ test('native proposal returns to the plan and cancellation prevents further cont
     await expect(page.getByRole('button', { name: 'Proponer', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Sí, voy', exact: true })).toHaveCount(0);
     await page.goto('/plans/' + planId + '/proposal');
-    await page.getByLabel('Correo electrónico').fill(email);
-    await page.getByLabel('Contraseña', { exact: true }).fill('NativeFlow2026');
-    await page.getByRole('button', { name: 'Entrar a QSale', exact: true }).click();
+    const closed = page.getByText('El plan ya está cerrado o cancelado. Puedes consultar sus propuestas.', { exact: true });
+    const login = page.getByLabel('Correo electrónico');
+    await expect(closed.or(login)).toBeVisible();
+    if (await login.isVisible()) {
+      await login.fill(email);
+      await page.getByLabel('Contraseña', { exact: true }).fill('NativeFlow2026');
+      await page.getByRole('button', { name: 'Entrar a QSale', exact: true }).click();
+    }
     await expect(
       page.getByText('El plan ya está cerrado o cancelado. Puedes consultar sus propuestas.', {
         exact: true,
