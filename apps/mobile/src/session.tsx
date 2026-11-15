@@ -172,6 +172,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         signIn: (input) => authenticate('signin', input),
         signUp: (input) => authenticate('signup', input),
         signOut: async () => {
+          const started = epoch;
+          if (tokens?.refreshToken) {
+            try {
+              await authHTTP.post('/logout', { refreshToken: tokens.refreshToken });
+            } catch (error) {
+              const normalized = toApiError(error);
+              if (![400, 401, 403].includes(normalized.status)) throw normalized;
+            }
+          }
+          if (started !== epoch) return;
           epoch++;
           pendingRefresh = null;
           await save(null);
