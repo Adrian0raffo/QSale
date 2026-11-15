@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.UUID;
 
 @Component
 public class JwtService {
@@ -31,18 +33,20 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(User user) {
-        return buildToken(user, ACCESS_TYPE, accessTokenExpiration);
+    public String generateAccessToken(User user, String sessionId) {
+        return buildToken(user, sessionId, ACCESS_TYPE, accessTokenExpiration);
     }
 
-    public String generateRefreshToken(User user) {
-        return buildToken(user, REFRESH_TYPE, refreshTokenExpiration);
+    public String generateRefreshToken(User user, String sessionId) {
+        return buildToken(user, sessionId, REFRESH_TYPE, refreshTokenExpiration);
     }
 
-    private String buildToken(User user, String type, Long expiration) {
+    private String buildToken(User user, String sessionId, String type, Long expiration) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(user.getEmail())
+                .id(UUID.randomUUID().toString())
+                .claim("sid", sessionId)
                 .claim("userId", user.getId())
                 .claim("role", user.getRole().name())
                 .claim("type", type)
@@ -70,6 +74,14 @@ public class JwtService {
 
     public String extractUsername(String token) {
         return extractClaims(token).getSubject();
+    }
+
+    public String extractSessionId(String token) {
+        return extractClaims(token).get("sid", String.class);
+    }
+
+    public Instant extractExpiration(String token) {
+        return extractClaims(token).getExpiration().toInstant();
     }
 
     private Claims extractClaims(String token) {

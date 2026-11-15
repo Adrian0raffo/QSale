@@ -47,6 +47,24 @@ export function createApp(config: Config) {
   app.post('/session/:action', async (req, res) => {
     const action = req.params.action;
     if (action === 'logout') {
+      const refreshToken = req.cookies.qsale_refresh;
+      if (refreshToken) {
+        try {
+          const result = await upstream(apiURL + '/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+            signal: AbortSignal.timeout(12_000),
+          });
+          if (!result.ok && ![400, 401, 403].includes(result.status)) {
+            res.status(502).json({ message: 'No pudimos cerrar la sesión. Inténtalo de nuevo.' });
+            return;
+          }
+        } catch {
+          res.status(502).json({ message: 'No pudimos cerrar la sesión. Inténtalo de nuevo.' });
+          return;
+        }
+      }
       res.clearCookie('qsale_refresh', cookie).sendStatus(204);
       return;
     }

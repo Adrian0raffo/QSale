@@ -33,8 +33,12 @@ let expireSession = () => {};
 async function refresh() {
   if (refreshRequest) return refreshRequest;
   const started = generation;
-  const request = sessionHTTP
-    .post<{ token: string }>('/refresh', undefined, { signal: sessionController.signal })
+  const send = () => sessionHTTP.post<{ token: string }>('/refresh', undefined, {
+    signal: sessionController.signal,
+  });
+  const request = (navigator.locks
+    ? navigator.locks.request('qsale-session-refresh', send)
+    : send())
     .then(({ data }) => {
       if (started !== generation) throw new axios.CanceledError('La sesión cambió.');
       accessToken = data.token;

@@ -77,3 +77,30 @@ it('forwards JWT and query parameters to the fixed API, without forwarding cooki
     Authorization: 'Bearer user-token',
   });
 });
+
+it('revokes the server session before deleting its refresh cookie', async () => {
+  const { app, upstream } = setup();
+  upstream.mockResolvedValue(new Response(null, { status: 204 }));
+  const result = await request(app).post('/session/logout').set('Origin', origin)
+    .set('Cookie', 'qsale_refresh=current-session').send({});
+  expect(result.status).toBe(204);
+  expect(upstream.mock.calls[0]![0]).toBe('https://backend.test/api/v1/auth/logout');
+  expect(upstream.mock.calls[0]![1]?.body).toBe(JSON.stringify({refreshToken:'current-session'}));
+  expect(result.headers['set-cookie'][0]).toContain('Expires=Thu, 01 Jan 1970');
+});
+
+it('keeps the cookie when logout cannot reach the API so revocation can be retried', async () => {
+  const { app, upstream } = setup();
+  upstream.mockRejectedValue(new Error('Network unavailable'));
+  const result = await request(app).post('/session/logout').set('Origin', origin)
+    .set('Cookie', 'qsale_refresh=current-session').send({});
+  expect(result.status).toBe(502);
+  expect(result.headers['set-cookie']).toBeUndefined();
+});
+
+it('can finish logout when there is no remaining refresh cookie', async () => {
+  const { app, upstream } = setup();
+  const result = await request(app).post('/session/logout').set('Origin', origin).send({});
+  expect(result.status).toBe(204);
+  expect(upstream).not.toHaveBeenCalled();
+});

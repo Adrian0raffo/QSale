@@ -2,6 +2,7 @@ package com.example.qsale.auth;
 
 import com.example.qsale.auth.components.JwtService;
 import com.example.qsale.auth.domain.AuthService;
+import com.example.qsale.auth.domain.AuthSessionService;
 import com.example.qsale.auth.dto.RefreshTokenRequest;
 import com.example.qsale.auth.dto.SignUpRequest;
 import com.example.qsale.auth.dto.TokenResponse;
@@ -42,7 +43,7 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private JwtService jwtService;
+    private AuthSessionService sessions;
 
     @Mock
     private AuthenticationManager authenticationManager;
@@ -68,8 +69,7 @@ class AuthServiceTest {
         SignUpRequest request = buildSignUpRequest("ANA@UTEC.EDU.PE");
         when(userRepository.existsByEmail("ana@utec.edu.pe")).thenReturn(false);
         when(passwordEncoder.encode("Secret123")).thenReturn("hashed-password");
-        when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-token");
-        when(jwtService.generateRefreshToken(any(User.class))).thenReturn("refresh-token");
+        when(sessions.issue(any(User.class))).thenReturn(new TokenResponse("access-token", "refresh-token"));
 
         TokenResponse response = authService.signUp(request);
 
@@ -87,7 +87,7 @@ class AuthServiceTest {
     void refreshShouldRejectInvalidToken() {
         RefreshTokenRequest request = new RefreshTokenRequest();
         request.setRefreshToken("not-a-valid-token");
-        when(jwtService.isRefreshTokenValid("not-a-valid-token")).thenReturn(false);
+        when(sessions.refresh("not-a-valid-token")).thenThrow(new UnauthorizedException("Invalid token"));
 
         assertThrows(UnauthorizedException.class, () -> authService.refresh(request));
     }
