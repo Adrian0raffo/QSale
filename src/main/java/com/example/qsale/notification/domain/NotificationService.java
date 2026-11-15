@@ -1,6 +1,8 @@
 package com.example.qsale.notification.domain;
 
 import com.example.qsale.exceptions.ResourceNotFoundException;
+import com.example.qsale.exceptions.InvalidOperationException;
+import com.example.qsale.notification.dto.NotificationPageResponseDto;
 import com.example.qsale.notification.dto.NotificationResponseDto;
 import com.example.qsale.notification.infrastructure.NotificationRepository;
 import com.example.qsale.option.domain.OptionType;
@@ -18,6 +20,9 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,6 +50,24 @@ public class NotificationService {
         return notifications.stream()
                 .map(notification -> modelMapper.map(notification, NotificationResponseDto.class))
                 .toList();
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public NotificationPageResponseDto getMyNotificationsPage(boolean unreadOnly, int page, int size) {
+        if (page < 0 || size < 1) {
+            throw new InvalidOperationException("page must be non-negative and size must be positive");
+        }
+        Long userId = userService.getCurrentUser().getId();
+        PageRequest pageable = PageRequest.of(page, Math.min(size, 100),
+                Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+        Page<Notification> notifications = unreadOnly
+                ? notificationRepository.findByRecipientIdAndReadAtIsNull(userId, pageable)
+                : notificationRepository.findByRecipientId(userId, pageable);
+        return new NotificationPageResponseDto(notifications.stream()
+                .map(notification -> modelMapper.map(notification, NotificationResponseDto.class)).toList(),
+                notifications.getNumber(), notifications.getSize(), notifications.getTotalElements(),
+                notifications.getTotalPages(), notificationRepository.countByRecipientIdAndReadAtIsNull(userId));
     }
 
     @PreAuthorize("isAuthenticated()")

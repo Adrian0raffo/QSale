@@ -77,7 +77,7 @@ public class GeoService {
         if (Double.isNaN(avgKm) || Double.isNaN(avgSeconds)) {
             throw new ExternalServiceException("OpenRouteService could not route any origin");
         }
-        return new TravelEstimateDto(round(avgKm), (int) Math.round(avgSeconds / 60));
+        return new TravelEstimateDto(round(avgKm), (int) Math.round(avgSeconds / 60), TravelEstimateSource.ROUTING);
     }
 
     private double average(List<List<Double>> matrix, int originCount) {
@@ -98,7 +98,7 @@ public class GeoService {
                 .average()
                 .orElse(0);
         int minutes = (int) Math.round(avgKm / AVERAGE_CITY_SPEED_KMH * 60);
-        return new TravelEstimateDto(round(avgKm), minutes);
+        return new TravelEstimateDto(round(avgKm), minutes, TravelEstimateSource.HAVERSINE);
     }
 
     public double haversineKm(Location from, Location to) {

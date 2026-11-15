@@ -3,6 +3,8 @@ package com.example.qsale.plan.domain;
 import com.example.qsale.exceptions.InvalidOperationException;
 import com.example.qsale.option.domain.PlanOptionService;
 import com.example.qsale.plan.infrastructure.PlanRepository;
+import com.example.qsale.plan.dto.PlanDetailDto;
+import com.example.qsale.participant.infrastructure.PlanParticipantRepository;
 import com.example.qsale.user.domain.Role;
 import com.example.qsale.user.domain.User;
 import com.example.qsale.user.domain.UserService;
@@ -32,6 +34,8 @@ class PlanServiceTest {
     @Mock
     private PlanRepository planRepository;
     @Mock
+    private PlanParticipantRepository participantRepository;
+    @Mock
     private PlanAccessService planAccessService;
     @Mock
     private FeasibilityService feasibilityService;
@@ -48,37 +52,37 @@ class PlanServiceTest {
 
     @BeforeEach
     void setUp() {
-        planService = new PlanService(planRepository, planAccessService, feasibilityService,
+        planService = new PlanService(planRepository, participantRepository, planAccessService, feasibilityService,
                 planOptionService, userService, modelMapper, eventPublisher);
     }
 
     @Test
     void rejectsNegativePage() {
         assertThrows(InvalidOperationException.class,
-                () -> planService.getMyPlans(null, -1, 10));
+                () -> planService.getMyPlans(null, -1, 10, "", "createdAt,desc"));
         verifyNoInteractions(userService, planRepository);
     }
 
     @Test
     void rejectsNonPositivePageSize() {
         assertThrows(InvalidOperationException.class,
-                () -> planService.getMyPlans(null, 0, 0));
+                () -> planService.getMyPlans(null, 0, 0, "", "createdAt,desc"));
         verifyNoInteractions(userService, planRepository);
     }
 
     @Test
-    void capsPageSizeAtFifty() {
+    void capsPageSizeAtOneHundred() {
         User user = new User();
         user.setId(1L);
         user.setRole(Role.USER);
         when(userService.getCurrentUser()).thenReturn(user);
-        when(planRepository.findByParticipantsUserId(any(), any())).thenReturn(Page.empty());
+        when(planRepository.searchMyPlans(any(), any(), any(), any())).thenReturn(Page.empty());
 
-        planService.getMyPlans(null, 0, 100);
+        planService.getMyPlans(null, 0, 1000, "", "createdAt,desc");
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(planRepository).findByParticipantsUserId(any(), pageableCaptor.capture());
-        assertEquals(50, pageableCaptor.getValue().getPageSize());
+        verify(planRepository).searchMyPlans(any(), any(), any(), pageableCaptor.capture());
+        assertEquals(100, pageableCaptor.getValue().getPageSize());
     }
 
     @Test
@@ -94,6 +98,7 @@ class PlanServiceTest {
             return null;
         }).when(feasibilityService).updateFeasibility(plan);
         when(planRepository.save(plan)).thenReturn(plan);
+        when(modelMapper.map(plan, PlanDetailDto.class)).thenReturn(new PlanDetailDto());
 
         planService.closePlan(1L);
 

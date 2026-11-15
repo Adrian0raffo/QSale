@@ -3,6 +3,8 @@ package com.example.qsale.plan.dto;
 import com.example.qsale.plan.domain.FeasibilityStatus;
 import com.example.qsale.plan.domain.PlanStatus;
 import com.example.qsale.plan.domain.PlanType;
+import com.example.qsale.participant.domain.ParticipantRole;
+import com.example.qsale.participant.domain.ParticipationStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -26,4 +28,6 @@ public class PlanResponseDto {
     private LocalDate tentativeEndDate;
     private String creatorName;
     private LocalDateTime createdAt;
+    private ParticipantRole currentUserRole;
+    private ParticipationStatus currentUserParticipationStatus;
 }

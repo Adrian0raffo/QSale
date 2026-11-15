@@ -2,6 +2,7 @@ package com.example.qsale.location;
 
 import com.example.qsale.location.domain.GeoService;
 import com.example.qsale.location.domain.Location;
+import com.example.qsale.location.domain.TravelEstimateSource;
 import com.example.qsale.location.dto.TravelEstimateDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -39,6 +40,7 @@ class GeoServiceTest {
 
         assertTrue(estimate.avgDistanceKm() > 3.0 && estimate.avgDistanceKm() < 3.4);
         assertTrue(estimate.avgTravelMinutes() > 0);
+        assertEquals(TravelEstimateSource.HAVERSINE, estimate.source());
     }
 
     @Test
@@ -50,6 +52,7 @@ class GeoServiceTest {
 
         double expectedAverage = geoService.haversineKm(miraflores, barranco) / 2;
         assertEquals(expectedAverage, estimate.avgDistanceKm(), 0.01);
+        assertEquals(TravelEstimateSource.HAVERSINE, estimate.source());
     }
 
     @Test
@@ -104,6 +107,7 @@ class GeoServiceTest {
 
         assertEquals(2.0, estimate.avgDistanceKm());
         assertEquals(2, estimate.avgTravelMinutes());
+        assertEquals(TravelEstimateSource.ROUTING, estimate.source());
         server.verify();
     }
 
