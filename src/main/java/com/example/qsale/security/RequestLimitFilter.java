@@ -28,7 +28,10 @@ public class RequestLimitFilter extends OncePerRequestFilter {
         String identity = !auth && principal != null && !(principal instanceof AnonymousAuthenticationToken)
                 ? "user:" + principal.getName() : "ip:" + request.getRemoteAddr();
         RequestLimits.Budget budget;
-        if (auth) budget = limits.consume(scope + ":auth:" + identity, authLimit);
+        if (auth) {
+            boolean session = request.getRequestURI().equals("/api/v1/auth/refresh") || request.getRequestURI().equals("/api/v1/auth/logout");
+            budget = limits.consume(scope + (session ? ":session:" : ":auth:") + identity, session ? apiLimit : authLimit);
+        }
         else {
             budget = limits.consume(scope + ":all:" + identity, Math.toIntExact(Math.min((long)apiLimit * 5, 1000000)));
             if (budget.allowed()) {

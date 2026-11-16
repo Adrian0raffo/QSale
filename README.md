@@ -135,7 +135,7 @@ Las sesiones revocables, reprogramaciones y trabajos persistentes amplían el mo
 
 ## 6. Medidas de seguridad
 
-Spring Security protege la API con Bearer JWT y `@PreAuthorize`; USER, ADMIN y permisos de organización se comprueban en el servidor. Argon2id usa 19 MiB, dos iteraciones y paralelismo uno; BCrypt migra tras un login correcto. Cinco fallos bloquean la cuenta 15 minutos. PostgreSQL limita la API a 120 solicitudes por ruta/minuto y 600 totales por usuario; autenticación, a 30 por IP. Devuelve 429 con Retry-After. Los eventos de seguridad registran identificadores hash.
+Spring Security protege la API con Bearer JWT y `@PreAuthorize`; USER, ADMIN y permisos de organización se comprueban en el servidor. Argon2id usa 19 MiB, dos iteraciones y paralelismo uno; BCrypt migra tras un login correcto. Cinco fallos bloquean la cuenta 15 minutos. PostgreSQL limita la API a 120 solicitudes por ruta/minuto y 600 totales por usuario; credenciales, a 30 por IP; renovación/logout, a 120 por IP. Devuelve 429 con Retry-After. Los eventos de seguridad registran identificadores hash.
 
 Cada sesión guarda el hash del refresh; rotarlo sustituye el anterior y su reutilización revoca esa sesión. Logout invalida acceso y renovación por dispositivo. La web conserva acceso en memoria y refresh en cookie HttpOnly/Secure/SameSite=Lax; el móvil usa SecureStore. Origin y un token CSRF firmado, ligado a la sesión, protegen las escrituras web.
 

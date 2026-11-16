@@ -147,6 +147,20 @@ class SecurityHardeningIntegrationTest extends AbstractContainerBaseTest {
         }
     }
 
+    @Test void sessionRenewalsHaveTheirOwnBudgetAndCannotConsumeCredentialAttempts() throws Exception {
+        var filter=new RequestLimitFilter(limits,5,2,UUID.randomUUID().toString());
+        for(int i=0;i<6;i++) {
+            var response=new MockHttpServletResponse();
+            filter.doFilter(new MockHttpServletRequest("POST","/api/v1/auth/refresh"),response,(req,res)->{});
+            assertEquals(i<5 ? 200 : 429,response.getStatus());
+        }
+        for(int i=0;i<3;i++) {
+            var response=new MockHttpServletResponse();
+            filter.doFilter(new MockHttpServletRequest("POST","/api/v1/auth/signin"),response,(req,res)->{});
+            assertEquals(i<2 ? 200 : 429,response.getStatus());
+        }
+    }
+
     @Test void productionTransportRejectsSpoofedHttpsAndAddsApiHeaders() throws Exception {
         var request=new MockHttpServletRequest("GET","/api/v1/plans"); request.addHeader("X-Forwarded-Proto","https");
         var response=new MockHttpServletResponse();
