@@ -11,7 +11,6 @@ public class BackgroundJobWorker {
     private final BackgroundQueue queue;
     private final BackgroundJobExecutor executor;
 
-    @Async
     @Scheduled(fixedDelayString="${jobs.poll-delay:500}")
     public void processPending() {
         for(int count=0;count<5;count++) {
