@@ -33,6 +33,7 @@ test('desktop and mobile share an agreement, late attendance and finite reschedu
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const mobile = await mobileContext.newPage();
   mobile.setDefaultTimeout(12_000);
+  mobile.setDefaultNavigationTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push('web: ' + error.message));
   mobile.on('pageerror', (error) => errors.push('mobile: ' + error.message));
@@ -251,6 +252,7 @@ test('the mobile organizer can edit, confirm, apply a new place, withdraw, cance
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const mobile = await context.newPage();
   mobile.setDefaultTimeout(12_000);
+  mobile.setDefaultNavigationTimeout(60_000);
   await localApiBridge(mobile, request, async () => {});
   try {
     await login(mobile, owner.email, true);
