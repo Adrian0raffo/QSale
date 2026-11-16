@@ -275,7 +275,7 @@ class Day2ApiIntegrationTest extends AbstractContainerBaseTest {
     }
 
     private long createDateOption(long planId, String token) throws Exception {
-        LocalDateTime startsAt = LocalDateTime.now().plusDays(5).withNano(0);
+        LocalDateTime startsAt = LocalDate.now().plusDays(5).atTime(10, 0);
         String body = """
                 {"type":"DATE","label":"Saturday morning","startsAt":"%s","endsAt":"%s"}
                 """.formatted(startsAt, startsAt.plusHours(3));
