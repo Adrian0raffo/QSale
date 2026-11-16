@@ -58,7 +58,13 @@ test('coordinate changes and rapid navigation do not leave map callbacks running
   ).toBeVisible();
   await page.getByLabel('Latitud', { exact: true }).fill('-12.12');
   await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
+  const profileSaved = page.waitForResponse(response =>
+    response.url().endsWith('/backend/api/v1/users/me') &&
+    response.request().method() === 'PUT' && response.ok(),
+  );
   await page.getByRole('button', { name: 'Guardar mi perfil', exact: true }).click();
+  await profileSaved;
+  await expect(page.getByText('Tu perfil está actualizado.', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('Latitud', { exact: true })).toHaveValue('-12.12');
   expect(errors).toEqual([]);
