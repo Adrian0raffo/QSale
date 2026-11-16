@@ -90,10 +90,11 @@ flowchart LR
     Service --> Repository[Repositories<br/>infrastructure]
     Repository --> DB[(PostgreSQL)]
     Service -. publica .-> Events[ApplicationEvents]
-    Events -. "@Async" .-> Listeners[Listeners]
+    Events -. "antes del commit" .-> Listeners[Listeners]
     Listeners --> Jobs[Cola persistente]
-    Jobs --> Mail[Resend / SMTP]
-    Jobs --> ORS[OpenRouteService]
+    Jobs -->|"@Async / taskExecutor"| Worker[Procesador de lotes]
+    Worker --> Mail[Resend / SMTP]
+    Worker --> ORS[OpenRouteService]
 ```
 
 Los controladores reciben y validan solicitudes HTTP; los servicios concentran reglas y permisos; los repositorios encapsulan persistencia. Se usan DTO separados para entrada y salida, de modo que contraseñas y relaciones JPA internas no se publican. Flyway aplica las migraciones versionadas y Hibernate valida la correspondencia con las entidades. `@Version` en planes y opciones permite detectar modificaciones concurrentes.

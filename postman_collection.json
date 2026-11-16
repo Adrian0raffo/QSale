@@ -152,6 +152,11 @@
     {
       "key": "planVersion",
       "value": "0"
+    },
+    {
+      "key": "backgroundJobId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -4030,7 +4035,8 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations"
+            "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations",
+            "description": "Compara disponibilidades vigentes de integrantes unidos. Devuelve hasta cinco días con cobertura, datos faltantes y coincidencia horaria. Es una recomendación; no cambia el acuerdo ni confirma asistencia. Requiere pertenecer al plan."
           },
           "event": [
             {
@@ -4049,7 +4055,8 @@
               "originalRequest": {
                 "method": "GET",
                 "header": [],
-                "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations"
+                "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations",
+                "description": "Compara disponibilidades vigentes de integrantes unidos. Devuelve hasta cinco días con cobertura, datos faltantes y coincidencia horaria. Es una recomendación; no cambia el acuerdo ni confirma asistencia. Requiere pertenecer al plan."
               },
               "status": "OK",
               "code": 200,
@@ -4093,7 +4100,8 @@
                   "type": "string"
                 }
               ]
-            }
+            },
+            "description": "Actualiza la asistencia individual después del cierre. Conserva el día, el lugar y las confirmaciones de los demás. Si el grupo pierde el mínimo, genera un aviso para quien organiza. Requiere participación aceptada; un plan cancelado rechaza cambios."
           },
           "event": [
             {
@@ -4136,7 +4144,8 @@
                       "type": "string"
                     }
                   ]
-                }
+                },
+                "description": "Actualiza la asistencia individual después del cierre. Conserva el día, el lugar y las confirmaciones de los demás. Si el grupo pierde el mínimo, genera un aviso para quien organiza. Requiere participación aceptada; un plan cancelado rechaza cambios."
               },
               "status": "OK",
               "code": 200,
@@ -4156,7 +4165,8 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}"
+            "url": "{{baseUrl}}/plans/{{planId}}",
+            "description": "Verifica que la baja de un asistente no reabre automáticamente el plan ni borra su acuerdo. El estado sigue CLOSED y agreementVersion identifica la versión vigente. Requiere pertenecer al plan."
           },
           "event": [
             {
@@ -4176,7 +4186,8 @@
               "originalRequest": {
                 "method": "GET",
                 "header": [],
-                "url": "{{baseUrl}}/plans/{{planId}}"
+                "url": "{{baseUrl}}/plans/{{planId}}",
+                "description": "Verifica que la baja de un asistente no reabre automáticamente el plan ni borra su acuerdo. El estado sigue CLOSED y agreementVersion identifica la versión vigente. Requiere pertenecer al plan."
               },
               "status": "OK",
               "code": 200,
@@ -4210,7 +4221,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Propone cambiar un plan confirmado. El día y el lugar actuales se conservan mientras se vota; la hora es opcional. El autor registra automáticamente un voto afirmativo. Requiere participación aceptada; devuelve 400 si no cambia el acuerdo o el día ya pasó."
           },
           "event": [
             {
@@ -4244,7 +4256,8 @@
                       "language": "json"
                     }
                   }
-                }
+                },
+                "description": "Propone cambiar un plan confirmado. El día y el lugar actuales se conservan mientras se vota; la hora es opcional. El autor registra automáticamente un voto afirmativo. Requiere participación aceptada; devuelve 400 si no cambia el acuerdo o el día ya pasó."
               },
               "status": "Created",
               "code": 201,
@@ -4264,7 +4277,8 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reschedules"
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+            "description": "Lista las propuestas y su historial, votos efectivos, voto propio, mínimo requerido, vencimiento y acciones autorizadas. Evalúa propuestas vencidas o reemplazadas por otra versión del acuerdo. Requiere pertenecer al plan."
           },
           "event": [
             {
@@ -4283,7 +4297,8 @@
               "originalRequest": {
                 "method": "GET",
                 "header": [],
-                "url": "{{baseUrl}}/plans/{{planId}}/reschedules"
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+                "description": "Lista las propuestas y su historial, votos efectivos, voto propio, mínimo requerido, vencimiento y acciones autorizadas. Evalúa propuestas vencidas o reemplazadas por otra versión del acuerdo. Requiere pertenecer al plan."
               },
               "status": "OK",
               "code": 200,
@@ -4327,7 +4342,8 @@
                   "type": "string"
                 }
               ]
-            }
+            },
+            "description": "Registra o cambia el voto personal sobre una propuesta activa. Un voto afirmativo significa que la persona asistiría si se aplica ese cambio; todavía no altera el acuerdo. Requiere participación aceptada y devuelve 409 cuando la propuesta ya no admite votos."
           },
           "event": [
             {
@@ -4370,7 +4386,8 @@
                       "type": "string"
                     }
                   ]
-                }
+                },
+                "description": "Registra o cambia el voto personal sobre una propuesta activa. Un voto afirmativo significa que la persona asistiría si se aplica ese cambio; todavía no altera el acuerdo. Requiere participación aceptada y devuelve 409 cuando la propuesta ya no admite votos."
               },
               "status": "OK",
               "code": 200,
@@ -4390,7 +4407,8 @@
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply"
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply",
+            "description": "Aplica una propuesta aprobada por mayoría y por el mínimo de asistentes. Solo el organizador o un administrador puede hacerlo. Incrementa agreementVersion, selecciona el nuevo día/lugar y convierte los votos afirmativos en confirmaciones sin una segunda pregunta. Las otras propuestas activas quedan reemplazadas."
           },
           "event": [
             {
@@ -4410,7 +4428,8 @@
               "originalRequest": {
                 "method": "PATCH",
                 "header": [],
-                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply"
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply",
+                "description": "Aplica una propuesta aprobada por mayoría y por el mínimo de asistentes. Solo el organizador o un administrador puede hacerlo. Incrementa agreementVersion, selecciona el nuevo día/lugar y convierte los votos afirmativos en confirmaciones sin una segunda pregunta. Las otras propuestas activas quedan reemplazadas."
               },
               "status": "OK",
               "code": 200,
@@ -4444,7 +4463,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Crea una segunda alternativa sobre el acuerdo vigente para demostrar su retiro. Usa nextRescheduleDate diferente de la fecha aplicada y futura. El acuerdo no cambia al publicar; se registra el voto afirmativo del autor."
           },
           "event": [
             {
@@ -4478,7 +4498,8 @@
                       "language": "json"
                     }
                   }
-                }
+                },
+                "description": "Crea una segunda alternativa sobre el acuerdo vigente para demostrar su retiro. Usa nextRescheduleDate diferente de la fecha aplicada y futura. El acuerdo no cambia al publicar; se registra el voto afirmativo del autor."
               },
               "status": "Created",
               "code": 201,
@@ -4498,7 +4519,8 @@
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw"
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw",
+            "description": "Retira una propuesta activa sin modificar el día, el lugar ni las asistencias actuales. Solo su autor, el organizador o un administrador puede retirarla. Devuelve estado WITHDRAWN; una propuesta terminada devuelve 409."
           },
           "event": [
             {
@@ -4518,7 +4540,8 @@
               "originalRequest": {
                 "method": "PATCH",
                 "header": [],
-                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw"
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw",
+                "description": "Retira una propuesta activa sin modificar el día, el lugar ni las asistencias actuales. Solo su autor, el organizador o un administrador puede retirarla. Devuelve estado WITHDRAWN; una propuesta terminada devuelve 409."
               },
               "status": "OK",
               "code": 200,
@@ -4538,7 +4561,8 @@
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reopen"
+            "url": "{{baseUrl}}/plans/{{planId}}/reopen",
+            "description": "Reabre explícitamente un plan confirmado. Solo el organizador o un administrador puede hacerlo. Conserva las opciones y votos, desmarca la selección, incrementa la versión del acuerdo y pasa las asistencias confirmadas a INTERESTED. A partir de aquí se puede invitar, editar y volver a decidir."
           },
           "event": [
             {
@@ -4558,7 +4582,8 @@
               "originalRequest": {
                 "method": "PATCH",
                 "header": [],
-                "url": "{{baseUrl}}/plans/{{planId}}/reopen"
+                "url": "{{baseUrl}}/plans/{{planId}}/reopen",
+                "description": "Reabre explícitamente un plan confirmado. Solo el organizador o un administrador puede hacerlo. Conserva las opciones y votos, desmarca la selección, incrementa la versión del acuerdo y pasa las asistencias confirmadas a INTERESTED. A partir de aquí se puede invitar, editar y volver a decidir."
               },
               "status": "OK",
               "code": 200,
@@ -5011,7 +5036,8 @@
                   "type": "string"
                 }
               ]
-            }
+            },
+            "description": "Lista hasta cien trabajos fallidos del ámbito configurado. Solo ADMIN puede consultar sus identificadores, tipo, intentos y último error resumido; no devuelve destinatarios, payloads ni credenciales. Usa un identificador del resultado en backgroundJobId para reintentarlo."
           },
           "event": [
             {
@@ -5040,7 +5066,8 @@
                       "type": "string"
                     }
                   ]
-                }
+                },
+                "description": "Lista hasta cien trabajos fallidos del ámbito configurado. Solo ADMIN puede consultar sus identificadores, tipo, intentos y último error resumido; no devuelve destinatarios, payloads ni credenciales. Usa un identificador del resultado en backgroundJobId para reintentarlo."
               },
               "status": "OK",
               "code": 200,
@@ -5069,7 +5096,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-            }
+            },
+            "description": "Revoca en el servidor la sesión asociada al refresh token del organizador. Invalida acceso y renovación de ese dispositivo y conserva otras sesiones. La operación es idempotente; requiere enviar refreshToken, no un access token."
           },
           "event": [
             {
@@ -5097,7 +5125,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-                }
+                },
+                "description": "Revoca en el servidor la sesión asociada al refresh token del organizador. Invalida acceso y renovación de ese dispositivo y conserva otras sesiones. La operación es idempotente; requiere enviar refreshToken, no un access token."
               },
               "status": "No Content",
               "code": 204,
@@ -5117,7 +5146,8 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/users/me"
+            "url": "{{baseUrl}}/users/me",
+            "description": "Comprueba que el access token de una sesión revocada ya no puede leer el perfil, aunque su firma y fecha de expiración todavía sean válidas. Debe ejecutarse después de revocar la sesión del organizador."
           },
           "event": [
             {
@@ -5136,7 +5166,8 @@
               "originalRequest": {
                 "method": "GET",
                 "header": [],
-                "url": "{{baseUrl}}/users/me"
+                "url": "{{baseUrl}}/users/me",
+                "description": "Comprueba que el access token de una sesión revocada ya no puede leer el perfil, aunque su firma y fecha de expiración todavía sean válidas. Debe ejecutarse después de revocar la sesión del organizador."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -5148,6 +5179,70 @@
                 }
               ],
               "body": "{\n  \"timestamp\": \"2026-11-15T19:37:47.5560493\",\n  \"status\": 401,\n  \"error\": \"Unauthorized\",\n  \"message\": \"Full authentication is required to access this resource\",\n  \"path\": \"/api/v1/users/me\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "[ADMIN] Retry a failed background job",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/admin/jobs/{{backgroundJobId}}/retry",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Reintenta un trabajo FAILED del ámbito configurado. Requiere ADMIN y un backgroundJobId obtenido del listado de fallidos. Restablece los intentos y lo deja disponible para el worker; devolver 204 no garantiza entrega externa. Devuelve 404 si el trabajo no existe o pertenece a otro ámbito. Se omite en la colección cuando no se configura un trabajo fallido."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"backgroundJobId\")) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/admin/jobs/{{backgroundJobId}}/retry",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": "Reintenta un trabajo FAILED del ámbito configurado. Requiere ADMIN y un backgroundJobId obtenido del listado de fallidos. Restablece los intentos y lo deja disponible para el worker; devolver 204 no garantiza entrega externa. Devuelve 404 si el trabajo no existe o pertenece a otro ámbito. Se omite en la colección cuando no se configura un trabajo fallido."
+              },
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
             }
           ]
         }

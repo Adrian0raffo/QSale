@@ -9,16 +9,11 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name="jobs.enabled",havingValue="true",matchIfMissing=true)
 public class BackgroundJobWorker {
     private final BackgroundQueue queue;
-    private final BackgroundJobExecutor executor;
+    private final BackgroundJobProcessor processor;
 
     @Scheduled(fixedDelayString="${jobs.poll-delay:500}")
     public void processPending() {
-        for(int count=0;count<5;count++) {
-            String id=queue.claim();
-            if(id==null)return;
-            try { executor.execute(id); }
-            catch(RuntimeException error) { queue.failed(id,error); }
-        }
+        processor.processBatch().join();
     }
 
     @Scheduled(fixedDelay=86400000)

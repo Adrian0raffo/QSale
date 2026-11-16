@@ -18,6 +18,7 @@ import static org.mockito.Mockito.*;
 class BackgroundJobIntegrationTest extends AbstractContainerBaseTest {
     @Autowired BackgroundQueue queue;
     @Autowired BackgroundJobExecutor executor;
+    @Autowired BackgroundJobProcessor processor;
     @Autowired BackgroundJobRepository jobs;
     @Autowired PlatformTransactionManager transactions;
     @Value("${jobs.scope}") String scope;
@@ -60,6 +61,21 @@ class BackgroundJobIntegrationTest extends AbstractContainerBaseTest {
             String created=queue.enqueue("EMAIL",mail());status.setRollbackOnly();return created;
         });
         assertFalse(jobs.existsById(id));assertNull(queue.claim());
+    }
+
+    @Test void aBatchUsesTheAsyncExecutorAndCompletesOnlyAfterItsJobsAreSaved() throws Exception {
+        String id = enqueue();
+        var deliveryThread = new java.util.concurrent.atomic.AtomicReference<String>();
+        when(email.sendHtmlEmail(anyString(), anyString(), anyString(), anyMap())).thenAnswer(call -> {
+            deliveryThread.set(Thread.currentThread().getName());
+            return true;
+        });
+
+        processor.processBatch().get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+        assertTrue(deliveryThread.get().startsWith("qsale-async-"));
+        assertEquals("DONE", jobs.findById(id).orElseThrow().getStatus());
+        assertNull(queue.claim());
     }
 
     private String enqueue() {
