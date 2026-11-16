@@ -1,6 +1,19 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const api = 'http://127.0.0.1:19080/api/v1';
+test('untrusted plan titles remain text and cannot execute script', async ({page,request}) => {
+  const headers=await account(page);
+  const name='<img src=x onerror="window.__qsaleInjected=true">';
+  const created=await request.post(api+'/plans',{headers:headers(),data:{name,type:'OTHER',minParticipants:2}});
+  expect(created.status()).toBe(201);
+  const plan=await created.json();
+  try {
+    await page.goto('/plans/'+plan.id);
+    await expect(page.getByRole('heading',{name,exact:true})).toBeVisible();
+    expect(await page.evaluate(()=>Reflect.get(window,'__qsaleInjected'))).toBeUndefined();
+    await expect(page.locator('img[src="x"]')).toHaveCount(0);
+  } finally { await request.delete(api+'/plans/'+plan.id,{headers:headers()}); }
+});
 async function account(page: Page) {
   let token = '';
   page.on('request', (request) => {
