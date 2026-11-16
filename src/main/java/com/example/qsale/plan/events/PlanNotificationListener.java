@@ -13,14 +13,12 @@ public class PlanNotificationListener {
 
     private final NotificationService notificationService;
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void notifyPlanUpdated(PlanUpdatedEvent event) {
         notificationService.notifyPlanUpdated(event.getPlanId());
     }
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void notifyPlanStatusChanged(PlanStatusChangedEvent event) {
         notificationService.notifyPlanStatusChanged(event.getPlanId());
     }

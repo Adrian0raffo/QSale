@@ -1,6 +1,8 @@
 package com.example.qsale.option.events;
 
 import com.example.qsale.option.domain.PlanOptionService;
+import com.example.qsale.jobs.BackgroundQueue;
+import com.example.qsale.jobs.JobPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -12,17 +14,16 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class PlaceOptionListener {
 
     private final PlanOptionService planOptionService;
+    private final BackgroundQueue queue;
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void calculateTravelEstimate(PlaceOptionCreatedEvent event) {
-        planOptionService.updateTravelEstimate(event.getOptionId());
+        queue.enqueue("TRAVEL_OPTION",JobPayload.target(event.getOptionId()));
     }
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void refreshPlanTravelEstimates(TravelEstimateRefreshRequestedEvent event) {
-        planOptionService.updatePlanTravelEstimates(event.getPlanId());
+        queue.enqueue("TRAVEL_PLAN",JobPayload.target(event.getPlanId()));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)

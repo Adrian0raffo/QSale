@@ -21,6 +21,8 @@ public abstract class AbstractContainerBaseTest {
 
     @DynamicPropertySource
     static void overrideTestProperties(DynamicPropertyRegistry registry) {
+        String jobScope=java.util.UUID.randomUUID().toString();
+        registry.add("jobs.scope",()->jobScope);
         registry.add("spring.datasource.url", postgresqlContainer::getJdbcUrl);
         registry.add("spring.datasource.username", postgresqlContainer::getUsername);
         registry.add("spring.datasource.password", postgresqlContainer::getPassword);
