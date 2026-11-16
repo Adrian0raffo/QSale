@@ -2,6 +2,8 @@ package com.example.qsale.plan.events;
 
 import com.example.qsale.notification.domain.NotificationService;
 import com.example.qsale.plan.domain.FeasibilityService;
+import com.example.qsale.jobs.BackgroundQueue;
+import com.example.qsale.jobs.JobPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -12,15 +14,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class FeasibilityListener {
 
-    private final FeasibilityService feasibilityService;
-    private final NotificationService notificationService;
+    private final BackgroundQueue queue;
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void recalculateFeasibility(PlanChangedEvent event) {
-        boolean becameReady = feasibilityService.recalculate(event.getPlanId());
-        if (becameReady) {
-            notificationService.notifyPlanReady(event.getPlanId());
-        }
+        queue.enqueue("FEASIBILITY",JobPayload.target(event.getPlanId()));
     }
 }

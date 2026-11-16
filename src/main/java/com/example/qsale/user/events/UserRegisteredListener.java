@@ -13,8 +13,7 @@ public class UserRegisteredListener {
 
     private final NotificationService notificationService;
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void sendWelcomeEmail(UserRegisteredEvent event) {
         notificationService.sendWelcomeEmail(event.getUserId());
     }
