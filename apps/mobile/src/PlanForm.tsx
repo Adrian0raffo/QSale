@@ -69,6 +69,7 @@ export default function PlanForm({ editing = false }: { editing?: boolean }) {
       reset(
         { ...query.data, description: query.data.description ?? '' },
         {
+          keepErrors: true,
           keepDirtyValues:
             loadedPlan.current === query.data.id && Object.keys(dirty.current).length > 0,
         },
