@@ -1351,7 +1351,7 @@
             "description": "Solo el organizador y solo si el plan está OPEN. Publica PlanChangedEvent (recalcula el semáforo) y PlanUpdatedEvent (avisa a los participantes).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
+              "raw": "{\n  \"version\": {{planVersion}},\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1374,7 +1374,7 @@
                 "description": "Solo el organizador y solo si el plan está OPEN. Publica PlanChangedEvent (recalcula el semáforo) y PlanUpdatedEvent (avisa a los participantes).",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
+                  "raw": "{\n  \"version\": {{planVersion}},\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
