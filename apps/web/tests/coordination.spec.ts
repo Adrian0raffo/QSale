@@ -69,16 +69,20 @@ test('desktop and mobile share an agreement, late attendance and finite reschedu
     await expect(mobile).toHaveURL(new RegExp('/plans/' + planId + '$'));
     await expect(mobile.getByText(/Hora por acordar/).first()).toBeVisible();
     await mobile.getByRole('button', { name: 'Votar', exact: true }).click();
+    await expect(mobile.getByRole('button', { name: 'Quitar mi voto', exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Día elegido desde el móvil' })).toBeVisible();
     await page.getByRole('button', { name: 'Votar', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Quitar mi voto', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Proponer', exact: true }).click();
     await page.getByRole('button', { name: 'Lugar', exact: true }).click();
     await page.getByLabel('Título de la propuesta').fill('Parque del acuerdo');
     await page.getByLabel('Latitud', { exact: true }).fill('-12.12');
     await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
     await page.getByRole('button', { name: 'Publicar propuesta', exact: true }).click();
-    await page.getByRole('button', { name: 'Votar', exact: true }).click();
+    await page.getByRole('article').filter({
+      has: page.getByRole('heading', { name: 'Parque del acuerdo', exact: true }),
+    }).getByRole('button', { name: 'Votar', exact: true }).click();
     await expect(mobile.getByText('Parque del acuerdo', { exact: true })).toBeVisible();
     await mobile.getByRole('button', { name: 'Votar', exact: true }).click();
     await mobile.getByRole('button', { name: 'Sí, voy', exact: true }).click();
