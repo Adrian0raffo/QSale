@@ -363,7 +363,8 @@ class CoordinationFlowIntegrationTest extends AbstractContainerBaseTest {
     void confirmationMailContainsTheActualAgreedDayWithoutInventingAnHour() throws Exception {
         Fixture f = closed(2);
         notifications.notifyPlanStatusChanged(f.id());
-        org.mockito.Mockito.verify(emailService, org.mockito.Mockito.atLeastOnce()).sendHtmlEmail(
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() ->
+            org.mockito.Mockito.verify(emailService, org.mockito.Mockito.atLeastOnce()).sendHtmlEmail(
             anyString(),
             anyString(),
             org.mockito.ArgumentMatchers.eq("email/plan-closed"),
@@ -372,6 +373,7 @@ class CoordinationFlowIntegrationTest extends AbstractContainerBaseTest {
                     values.get("selectedDate").toString().contains(day.toString()) &&
                     values.get("selectedDate").toString().contains("Hora por acordar") &&
                     values.get("selectedPlace").equals("Parque elegido")
+            )
             )
         );
     }
