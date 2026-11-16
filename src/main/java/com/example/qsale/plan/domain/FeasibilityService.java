@@ -1,6 +1,8 @@
 package com.example.qsale.plan.domain;
 
 import com.example.qsale.availability.infrastructure.AvailabilityRepository;
+import com.example.qsale.availability.domain.AvailabilityCompatibility;
+import java.util.Comparator;
 import com.example.qsale.commitment.domain.CommitmentStatus;
 import com.example.qsale.commitment.infrastructure.CommitmentResponseRepository;
 import com.example.qsale.option.domain.OptionType;
@@ -107,10 +109,13 @@ public class FeasibilityService {
     }
 
     private long countUsersWithAvailability(Long planId) {
-        return availabilityRepository.findByPlanId(planId).stream()
-                .map(availability -> availability.getUser().getId())
-                .distinct()
-                .count();
+        List<com.example.qsale.availability.domain.Availability> entries = availabilityRepository.findByPlanId(planId);
+        PlanOption date = optionRepository.findByPlanIdAndType(planId, OptionType.DATE).stream()
+                .filter(option -> option.isUpcoming(ZoneId.of(timeZone)))
+                .filter(option -> voteRepository.countByOptionId(option.getId()) > 0)
+                .max(Comparator.<PlanOption>comparingLong(option -> voteRepository.countByOptionId(option.getId()))
+                        .thenComparing(option -> -option.getId())).orElse(null);
+        return AvailabilityCompatibility.count(entries, date);
     }
 
     private long countConfirmed(Long planId) {
