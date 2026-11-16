@@ -23,20 +23,24 @@ export function MapView({
   const element = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.LayerGroup | null>(null);
+  const tiles = useRef<L.TileLayer | null>(null);
+  const [failed, setFailed] = useState(false);
   const select = useRef(onSelect);
   select.current = onSelect;
   useEffect(() => {
     if (!element.current) return;
     const center = initial ?? points[0] ?? { latitude: -12.115, longitude: -77.025 };
-    map.current = L.map(element.current, { scrollWheelZoom: false, zoomAnimation: false }).setView(
-      [center.latitude, center.longitude],
-      12,
-    );
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    map.current = L.map(element.current, {
+      scrollWheelZoom: false,
+      zoomAnimation: false,
+    }).setView([center.latitude, center.longitude], 12);
+    tiles.current = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
       maxZoom: 19,
-    }).addTo(map.current);
+    })
+      .on('tileerror', () => setFailed(true))
+      .addTo(map.current);
     markers.current = L.layerGroup().addTo(map.current);
     map.current.on('click', (event: L.LeafletMouseEvent) =>
       select.current?.({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
@@ -49,11 +53,15 @@ export function MapView({
       map.current?.remove();
       map.current = null;
       markers.current = null;
+      tiles.current = null;
     };
   }, []);
   useEffect(() => {
     markers.current?.clearLayers();
-    const displayed = [...points, ...(initial ? [{ ...initial, label: 'Ubicación elegida' }] : [])];
+    const displayed = [
+      ...points,
+      ...(initial ? [{ ...initial, label: 'Ubicación elegida' }] : []),
+    ];
     displayed.forEach((point) => {
       const text = document.createElement('span');
       text.textContent = point.label;
@@ -75,16 +83,35 @@ export function MapView({
       });
   }, [points, initial]);
   return (
-    <div
-      className="map"
-      ref={element}
-      aria-label={
-        onSelect
-          ? 'Mapa para elegir ubicación. También puedes usar los campos de coordenadas.'
-          : 'Mapa de lugares propuestos y punto medio'
-      }
-      role="region"
-    />
+    <div>
+      <div
+        className="map"
+        ref={element}
+        aria-label={
+          onSelect
+            ? 'Mapa para elegir ubicación. También puedes usar los campos de coordenadas.'
+            : 'Mapa de lugares propuestos y punto medio'
+        }
+        role="region"
+      />
+      {failed && (
+        <div role="status" className="form-hint">
+          <p>
+            No pudimos cargar parte del mapa. Puedes usar las coordenadas o volver a intentarlo.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setFailed(false);
+              tiles.current?.redraw();
+            }}
+          >
+            Reintentar mapa
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 export function LocationPicker({
@@ -109,7 +136,9 @@ export function LocationPicker({
       Number.isFinite(Number(longitude)) &&
       Math.abs(Number(latitude)) <= 90 &&
       Math.abs(Number(longitude)) <= 180;
-    onChange(valid ? { latitude: Number(latitude), longitude: Number(longitude), address } : null);
+    onChange(
+      valid ? { latitude: Number(latitude), longitude: Number(longitude), address } : null,
+    );
     onValidityChange?.(valid || (!latitude && !longitude && !address));
   };
   const select = (point: Location) => {

@@ -1,28 +1,14 @@
-# QSale — Coordinación inteligente de planes grupales
+# QSale — Coordinación de planes grupales
 
-**Curso:** CS 2031 Desarrollo Basado en Plataforma — 2026-2
+**Curso:** CS 2031 Desarrollo Basado en Plataforma, 2026-2.
 
-**Integrantes:** Gonzalo Gaviño · Mathias Pariona · Adriano Raffo
+| Integrante | Aportes observables en Git | Cumplimiento declarado |
+|---|---|---:|
+| Gonzalo Gaviño | Integración web/móvil, despliegue, coordinación y reprogramación | 100 % |
+| Mathias Pariona | Autenticación, usuarios, API de planes, eventos, correo y geografía | 100 % |
+| Adriano Raffo | Modelo inicial, Docker, excepciones y documentación inicial | 100 % |
 
-| Integrante | Principales aportes | Cumplimiento individual |
-|---|---|---|
-| Gonzalo Gaviño | Pendiente de detallar | 100 % |
-| Mathias Pariona | Pendiente de detallar | 100 % |
-| Adriano Raffo | Pendiente de detallar | 100 % |
-
-El cumplimiento individual fue indicado por el equipo. Los aportes deben detallarse antes de la entrega.
-
-**Despliegue:** AWS EC2 + Dokploy + RDS PostgreSQL · **Postman:** [`postman_collection.json`](postman_collection.json)
-
-**URLs verificadas el 15 de noviembre de 2026:** [Web](https://web.98.94.89.19.sslip.io) · [Health](https://api.98.94.89.19.sslip.io/actuator/health) · [Swagger UI](https://api.98.94.89.19.sslip.io/swagger-ui.html).
-
-**Publicación móvil:** [QSale en Expo, rama preview](https://expo.dev/accounts/gonzagl05/projects/qsale/updates/dc186f21-174e-4b8a-95c4-02d23966730a). Los paquetes Android/iOS están publicados. El equipo comprobó la apertura en Expo Go en iPhone con datos móviles y Metro detenido, y guardó y recuperó la ubicación del perfil.
-
-La publicación enlazada corresponde al commit `f40ce94`; las correcciones de coordinación descritas más abajo requieren actualizar backend, web y Expo.
-
-Los recursos AWS se detienen entre sesiones para conservar el crédito del laboratorio; las URLs requieren que EC2 y RDS estén encendidas. Al iniciar EC2, comprueba su IP pública. Si cambia, actualiza los dominios, las URLs de los servicios y la publicación móvil.
-
----
+El resumen se apoya en los commits `063d5f2`, `a5641df`, `0cd19f7`, `1e6a305` y `5b16416`. Los porcentajes fueron declarados por el equipo; no se calculan por cantidad de commits ni sustituyen la confirmación de trabajo compartido.
 
 ## Índice
 
@@ -105,8 +91,9 @@ flowchart LR
     Repository --> DB[(PostgreSQL)]
     Service -. publica .-> Events[ApplicationEvents]
     Events -. "@Async" .-> Listeners[Listeners]
-    Listeners --> Mail[Resend / SMTP]
-    Listeners --> ORS[OpenRouteService]
+    Listeners --> Jobs[Cola persistente]
+    Jobs --> Mail[Resend / SMTP]
+    Jobs --> ORS[OpenRouteService]
 ```
 
 Los controladores reciben y validan solicitudes HTTP; los servicios concentran reglas y permisos; los repositorios encapsulan persistencia. Se usan DTO separados para entrada y salida, de modo que contraseñas y relaciones JPA internas no se publican. Flyway aplica las migraciones versionadas y Hibernate valida la correspondencia con las entidades. `@Version` en planes y opciones permite detectar modificaciones concurrentes.
@@ -128,11 +115,16 @@ erDiagram
     USER ||--o{ NOTIFICATION : recibe
     USER ||--o| LOCATION : tiene
     PLAN_OPTION ||--o| LOCATION : refiere
+    USER ||--o{ AUTH_SESSION : autentica
+    PLAN ||--o{ RESCHEDULE_PROPOSAL : revisa
+    RESCHEDULE_PROPOSAL ||--o{ RESCHEDULE_VOTE : recibe
     PLAN ||--o{ RESCHEDULE_PROPOSAL : recibe
     USER ||--o{ RESCHEDULE_PROPOSAL : propone
     RESCHEDULE_PROPOSAL ||--o{ RESCHEDULE_VOTE : registra
     USER ||--o{ RESCHEDULE_VOTE : vota
 ```
+
+Las sesiones revocables, reprogramaciones y trabajos persistentes amplían el modelo inicial.
 
 `User` guarda identidad, rol y ubicación opcional. `Plan` mantiene el presupuesto, mínimo de asistentes, fechas, código de invitación, estado y semáforo. `PlanParticipant` relaciona usuarios con planes y diferencia organizador, invitado y miembro unido. `PlanOption` contiene fechas o lugares propuestos; un lugar se asocia a `Location`, que guarda dirección y coordenadas. `Vote`, `Availability` y `CommitmentResponse` registran las decisiones individuales. `Notification` persiste avisos, fecha de lectura y estado de envío. `RescheduleProposal` guarda una alternativa de acuerdo con su versión, día, hora opcional, rango de fechas, lugar y vencimiento; `RescheduleVote` conserva la respuesta sí/no única de cada integrante. La base incluye unicidad de email, código de invitación, voto por usuario/opción y compromiso por usuario/plan; las claves foráneas e índices sostienen integridad y consultas frecuentes. Los DTO y Bean Validation restringen rangos, longitud y formato antes de guardar.
 
@@ -142,205 +134,47 @@ erDiagram
 
 ## 6. Medidas de seguridad
 
-Spring Security usa sesiones `STATELESS`, JWT en `Authorization: Bearer` y BCrypt para las contraseñas. El login emite tokens de acceso y refresh; el filtro verifica firma, vencimiento y tipo, y carga al usuario desde la base. La clave `JWT_SECRET` se obtiene del entorno. Registro, login, Swagger y salud son públicos; el resto requiere autenticación. Los endpoints `/api/v1/admin/**` exigen rol `ADMIN`. `PlanAccessService` aplica membresía y rol de organizador dentro de los servicios, no solo en la URL. CORS permite únicamente los orígenes configurados en `CORS_ALLOWED_ORIGINS` y CSRF está desactivado para esta API sin cookies de sesión.
+Spring Security protege la API con Bearer JWT y aplica permisos en los servicios mediante `@PreAuthorize`. USER y ADMIN se guardan en PostgreSQL; organizar un plan requiere autorización específica. El registro valida unicidad de correo y fortaleza de contraseña; BCrypt exige hasta 72 bytes UTF-8. No se puede retirar el acceso al último administrador.
 
-Las consultas JPA parametrizadas evitan concatenar SQL de entrada del cliente, los DTO no exponen hashes de contraseña y las validaciones rechazan datos inconsistentes. Ninguna credencial de producción debe quedar en Git, capturas, Postman ni logs. Si una contraseña o clave se comparte por error, hay que revocarla o rotarla en el proveedor y actualizar el servicio; cambiar un archivo local no invalida la credencial anterior.
+Cada inicio de sesión tiene un registro revocable y guarda únicamente el hash del refresh. Renovarlo lo sustituye; reutilizar uno anterior revoca esa sesión. Logout invalida acceso y renovación sin afectar otros dispositivos. La web conserva acceso en memoria y refresh en cookie HttpOnly, Secure en producción y SameSite=Lax; el móvil usa SecureStore. Actualizar esta política exige reautenticar las sesiones anteriores.
+
+CORS limita los orígenes y Express comprueba Origin al escribir. Los DTO no exponen contraseñas; las consultas parametrizadas evitan concatenar SQL. Las claves deben permanecer en el entorno. La edición incluye una versión y devuelve 409 si el formulario quedó desactualizado, conservando el borrador.
 
 ## 7. Eventos y asincronía
 
-El registro, las invitaciones, los cambios de plan, los votos y las respuestas publican eventos. Los listeners recalculan la viabilidad, crean notificaciones y preparan correos; `@EnableAsync` y un `ThreadPoolTaskExecutor` desacoplan las operaciones externas del tiempo de respuesta HTTP. Hay plantillas Thymeleaf para bienvenida, invitación, plan listo y cierre. Las notificaciones se pueden listar y marcar como leídas, y un fallo del proveedor de correo queda registrado como estado `FAILED` cuando se intenta enviar el aviso.
+Registro, invitación, votos, estado y ubicación publican eventos. Las notificaciones y trabajos se persisten dentro de la transacción original: un rollback también elimina sus trabajos. Los workers asíncronos procesan correos y rutas, recuperan leases abandonados y reintentan con espera creciente hasta ocho intentos. Los completados se conservan siete días.
 
-En desarrollo, JavaMailSender usa Mailpit en `localhost:1025`, con bandeja en `http://localhost:8025`. En AWS, el correo usa la API HTTPS de Resend con `RESEND_API_KEY` y `MAIL_FROM`. El remitente `onboarding@resend.dev` solo permite destinatarios autorizados por Resend; las invitaciones a otros usuarios requieren un dominio verificado. Comprueba la recepción real, además de la respuesta del proveedor.
+Una falla de correo conserva el aviso dentro de QSale. Un administrador consulta `GET /api/v1/admin/jobs` y reintenta con `POST /api/v1/admin/jobs/{id}/retry`. La entrega de correo es al menos una vez: una caída entre aceptación SMTP y commit podría duplicarla. Se usan plantillas Thymeleaf, Mailpit local y SMTP/Resend en producción. Haversine respalda rutas fallidas y se identifica como aproximación.
 
 ## 8. GitHub & Management
 
-El equipo integra cambios mediante pull requests hacia `main`. `.github/workflows/ci.yml` ejecuta `mvn -B clean verify` con Java 21; `.github/workflows/frontend.yml` comprueba los clientes y sus paquetes. Estos workflows no despliegan. GitHub Actions no inicia los jobs debido al bloqueo de facturación de la cuenta; el equipo abrió una solicitud de soporte. Los PR documentan las validaciones locales, sin presentarlas como ejecuciones remotas aprobadas. Los secretos se configuran en Dokploy.
+Las tareas se trabajan en ramas y PR por corrección, con commits descriptivos en inglés y validación previa. Los workflows comprueban Maven, TypeScript, unitarias, build, paquetes nativos y recorridos aislados. El fork `Adrian0raffo/QSale` permite validar con esa cuenta; la entrega continúa en `Gongl05/QSale`. Las ejecuciones no se trasladan entre repositorios: se enlaza su evidencia en el PR. El bloqueo de facturación del propietario original requiere soporte. No se acredita uso de Projects/milestones sin evidencia de su utilización.
 
 ## 9. Ejecución local y despliegue
 
-Se necesitan Java 21, Maven y Docker. Desde la raíz del repositorio, ejecutar `docker compose up -d`, configurar un `JWT_SECRET` aleatorio de al menos 32 caracteres y lanzar `./mvnw spring-boot:run` (en Windows, `.\mvnw.cmd spring-boot:run`). PostgreSQL queda en el puerto 5433, Mailpit en 8025 y la API en 8080. La primera ejecución aplica Flyway; no usar `ddl-auto=create` en bases compartidas. Comprobar `GET /actuator/health` y abrir `/swagger-ui.html`.
-
-Las variables de entorno principales son:
-
-| Variable | Obligatoria | Uso |
-|---|---:|---|
-| `JWT_SECRET` | Sí | Firma de tokens JWT; usar una cadena aleatoria de al menos 32 caracteres. |
-| `SPRING_DATASOURCE_URL` | AWS | URL JDBC de RDS con `sslmode=require`. |
-| `DB_HOST`, `DB_PORT`, `DB_NAME` | Local | Host, puerto y base; por defecto `localhost:5433/qsale`. |
-| `DB_USER`, `DB_PASSWORD` | AWS | Credenciales de RDS; local usa `postgres` por defecto. |
-| `DATABASE_URL` | Opcional | Alternativa PostgreSQL compatible; déjala ausente en AWS para no reemplazar la conexión a RDS. |
-| `MAPS_API_KEY` | Opcional | Clave de OpenRouteService para rutas y tiempos reales; sin ella se usa Haversine. |
-| `RESEND_API_KEY` | Opcional | Clave de Resend para enviar correo por HTTPS. |
-| `MAIL_FROM` | Recomendada | Remitente verificado, por ejemplo `QSale <onboarding@resend.dev>`. |
-| `CORS_ALLOWED_ORIGINS` | Opcional | Orígenes permitidos por CORS, separados por comas. |
-
-### Clientes web y móvil
-
-Los clientes están en `apps/web` y `apps/mobile`. Comparten los contratos, validaciones y el cliente Axios de `packages/contracts` y `packages/api-client`. La información de planes, votos, disponibilidad, asistencia y notificaciones procede de la API. El listado de planes y las notificaciones usan endpoints paginados diferentes; el tamaño admite 10, 25, 50 y 100 elementos.
-
-Necesitas Node.js 24 y una API local en ejecución. Instala las dependencias desde la raíz:
+Requisitos: Java 21, Node 24 y Docker. Ejecuta `docker compose up -d`, configura `JWT_SECRET` aleatorio de al menos 32 caracteres y lanza `./mvnw spring-boot:run` o `.\mvnw.cmd spring-boot:run`. API: 8080; PostgreSQL: 5433; SMTP: 1025; bandeja Mailpit: 8025. Swagger: `/swagger-ui.html`.
 
 ```sh
 npm ci
 npm run dev:web
-```
-
-La web abre en `http://127.0.0.1:5173`; su servidor de sesión escucha en `3001`. El valor de desarrollo de `API_URL` es `http://127.0.0.1:19080/api/v1`. Si ejecutas Spring Boot en su puerto habitual `8080`, configura `API_URL=http://127.0.0.1:8080/api/v1` al iniciar el proceso o en `apps/web/.env.local`. Este archivo queda excluido de Git y Docker. `APP_ORIGIN` debe coincidir exactamente con el origen del navegador; su valor local es `http://127.0.0.1:5173`.
-
-El navegador conserva el token de acceso en memoria y el de renovación en una cookie HttpOnly. En producción la cookie también usa Secure y SameSite=Lax. El servidor de sesión comprueba el origen de las operaciones de escritura, y el proxy no permite acceder directamente a los endpoints de autenticación. Ambos clientes comparten renovación de sesión, cancelación de consultas y reintentos limitados a lecturas ante fallos temporales. No se reintentan escrituras automáticamente.
-
-Para abrir la app móvil, configura `EXPO_PUBLIC_API_URL` con la URL de la API accesible desde el teléfono y ejecuta:
-
-```sh
 npm run dev:mobile
 ```
 
-En una prueba por Wi-Fi, el teléfono y la computadora deben estar en la misma red. Usa la IPv4 privada de la computadora; `localhost` en el teléfono apunta al propio teléfono. Expo Go y la CLI deben tener sesión iniciada en la misma cuenta de Expo. Abre el QR de desarrollo con la cámara del iPhone o desde Expo Go. La app solicita permisos de cámara y ubicación cuando seleccionas esas acciones; puedes escribir el código o las coordenadas si no concedes el permiso. Los tokens se guardan con SecureStore en iOS y Android; la vista previa de navegador usa memoria.
+La web abre en `http://127.0.0.1:5173`. Configura `API_URL=http://127.0.0.1:8080/api/v1` y `APP_ORIGIN` con el origen exacto. El puerto predeterminado 19080 corresponde a las pruebas aisladas. En el teléfono, `EXPO_PUBLIC_API_URL` debe ser accesible desde su red; `EXPO_PUBLIC_WEB_URL` define las invitaciones admitidas. Cámara y GPS se solicitan al usarlos; hay entrada manual.
 
-`EXPO_PUBLIC_WEB_URL` define el origen web admitido para los enlaces de invitación. Los QR también admiten el esquema `qsale://join/CODIGO`. Sin una URL web configurada, ese esquema sirve al lector interno de QSale; abrirlo desde otras apps requiere tener instalado el cliente nativo. Las variables `EXPO_PUBLIC_*` se incluyen en el cliente: configura únicamente URLs públicas, nunca contraseñas ni claves de mapas o correo.
+Variables: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `CORS_ALLOWED_ORIGINS`, `MAPS_API_KEY`, `RESEND_API_KEY`, `MAIL_FROM` y `PLANS_TIME_ZONE`. AWS usa `SPRING_DATASOURCE_URL` hacia RDS con TLS y `SHOW_SQL=false`. El backend emplea el Dockerfile raíz; la web, `apps/web/Dockerfile`, puerto 3001 y HTTPS.
 
-Los horarios de las propuestas se coordinan en `America/Lima`. `PLANS_TIME_ZONE` configura el reloj de las validaciones del backend para evitar que un servidor UTC rechace una hora futura de Lima. Las estimaciones muestran si provienen de rutas o de Haversine; no se presentan como tráfico real ni como rutas individuales de los participantes.
+Validación: `./mvnw verify`, `npm run check`, `npm test`, `npm run build:web`, `npm run test:web` y `npm run test:mobile-form`. Los recorridos necesitan API temporal en 19080, PostgreSQL y correo local; nunca producción. Desde móvil, `npx expo-doctor` y `npx expo export --platform android --platform ios --output-dir dist` validan configuración y paquetes, sin certificar sensores, permisos o SecureStore físicos.
 
-Comprueba el código con:
-
-```sh
-npm run check
-npm test
-npm run build:web
-npm run test:web
-npm run test:mobile-form
-```
-
-Las pruebas web también abren la vista previa Expo para comprobar el intercambio entre clientes. Playwright inicia los servidores web y Expo si no están en ejecución. La prueba de navegador usa una API aislada en `127.0.0.1:19080`, PostgreSQL y Mailpit; crea cuentas y planes de prueba y elimina sus planes al terminar. No la ejecutes contra una base compartida o de producción. Para comprobar los paquetes nativos, ejecuta desde `apps/mobile`:
-
-```sh
-npx expo-doctor
-npx expo export --platform all --output-dir dist
-```
-
-Exportar comprueba la generación de los paquetes; la cámara, el GPS, los permisos, la persistencia y la navegación también deben probarse en el dispositivo. `apps/mobile/eas.json` prepara perfiles de desarrollo y distribución interna; esos perfiles no implican que exista un build publicado.
-
-### Preparar la distribución móvil
-
-El proyecto está vinculado a [@gonzagl05/qsale en Expo](https://expo.dev/accounts/gonzagl05/projects/qsale). `expo-updates`, la URL del proyecto y los canales de desarrollo, vista previa y producción están configurados. La vinculación no publica la app ni inicia compilaciones.
-
-La actualización `dc186f21-174e-4b8a-95c4-02d23966730a`, basada en el commit `f40ce94`, está publicada para Android e iOS con la API y la web HTTPS verificadas. El manifiesto iOS y la descarga del paquete respondieron correctamente; su hash coincidió y el paquete contiene ambas URLs públicas. El equipo abrió esa publicación en Expo Go en iPhone con datos móviles y Metro detenido; comprobó GPS, guardado del perfil y recuperación de la ubicación después de cerrar sesión y volver a entrar.
-
-Antes de publicar, configura `EXPO_PUBLIC_API_URL` con la API HTTPS verificada y `EXPO_PUBLIC_WEB_URL` con el origen web HTTPS en el entorno `preview` de Expo. Desde `apps/mobile`, ejecuta:
-
-```sh
-npx eas-cli update --branch preview --environment preview --message "QSale: versión de revisión"
-```
-
-Abre el enlace de la actualización en el dispositivo que usará el docente y comprueba que carga con Metro detenido y desde otra red. Una actualización requiere un cliente compatible con su runtime y sus módulos nativos; comprueba la compatibilidad con Expo Go antes de dar por terminada la entrega. El perfil `preview` también permite generar un APK Android. La distribución de un cliente iOS propio requiere resolver la firma de Apple por separado. No se ha contratado un plan ni se ha iniciado un build de pago.
-
-### Desplegar la web en el servidor existente
-
-Usa el repositorio como contexto raíz y `apps/web/Dockerfile` como Dockerfile. El contenedor sirve la web y el intermediario de sesión en el puerto `3001`. Configura `NODE_ENV=production`, `APP_ORIGIN` con el origen HTTPS público de la web y `API_URL` con la raíz real de la API, incluida la terminación `/api/v1`. Dokploy debe publicar el puerto `3001` mediante HTTPS. No hace falta crear otra instancia EC2, otra base de datos ni una IP elástica para este servicio.
-
-El servicio `qsale-web` usa el proveedor **Git**, URL `https://github.com/Gongl05/QSale.git`, rama `main`, Build Path `/`, Dockerfile Path `apps/web/Dockerfile` y Docker Context Path `.`. Esta conexión HTTPS al repositorio público permite desplegar manualmente sin una instalación de GitHub App. La configuración de despliegues automáticos requiere una comprobación separada.
-
-Comprueba `/health`, acceso y recarga de sesión, rutas directas como `/plans/ID`, invitaciones entre dos usuarios y ambas paginaciones desde la URL pública. El despliegue de la API debe incluir las migraciones V1 y V2 antes de usar los clientes. Configura la app móvil con la URL HTTPS vigente y comprueba ambos clientes contra la misma API. La verificación local no sustituye esas comprobaciones públicas ni la disponibilidad durante la evaluación.
-
-### AWS con Dokploy
-
-El despliegue configurado en `us-east-1` usa `qsale-backend` (EC2 Ubuntu 24.04, `t3.medium`, 30 GiB gp3) y `qsale-db` (RDS PostgreSQL 16, `db.t3.micro`, Single-AZ, 20 GiB gp2, acceso privado). Dokploy construye el `Dockerfile` de `main` y publica el puerto interno `8080` mediante HTTPS. RDS permite conexiones desde el grupo de seguridad de EC2.
-
-En **QSale → production → backend → Environment**, configura las variables de producción:
-
-```dotenv
-PORT=8080
-SPRING_DATASOURCE_URL=jdbc:postgresql://RDS_ENDPOINT:5432/qsale?sslmode=require
-DB_USER=postgres
-DB_PASSWORD=RDS_PASSWORD
-JWT_SECRET=RANDOM_SECRET
-DDL_AUTO=validate
-SHOW_SQL=false
-ADMIN_BOOTSTRAP_ENABLED=false
-SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=3
-SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=0
-JAVA_TOOL_OPTIONS="-Xms128m -Xmx512m -XX:ActiveProcessorCount=2"
-```
-
-Sustituye `RDS_ENDPOINT` y `RDS_PASSWORD` por los datos de RDS, y `RANDOM_SECRET` por una clave privada aleatoria de al menos 32 caracteres. Conserva las claves de mapas y correo en ese panel; no las copies a Postman ni a Git. Sin `MAPS_API_KEY`, el cálculo usa Haversine a 25 km/h, sin tráfico real.
-
-Para retomar el despliegue existente:
-
-1. Revisa el saldo de AWS Academy e inicia RDS y EC2 cuando necesites probar en AWS.
-2. Espera RDS **Disponible** y EC2 **En ejecución**; comprueba la IP pública de EC2.
-3. Si cambió la IP, actualiza los hosts `api.IP_PUBLICA.sslip.io` y `web.IP_PUBLICA.sslip.io` en **Domains**, con HTTPS y puertos internos `8080` y `3001`, respectivamente. En la web, actualiza `APP_ORIGIN` y `API_URL`; en el entorno de Expo, actualiza ambas `EXPO_PUBLIC_*` y publica otra actualización.
-4. Comprueba `/actuator/health` de la API (`UP`), `/health` de la web, Swagger y `/api/v1/users/me` sin token (`401`). Si cambió el código o el entorno, despliega `main` desde Dokploy y repite las comprobaciones. Construye backend y web por separado para limitar el uso de memoria del servidor.
-5. Configura `hostUrl` de Postman con la URL HTTPS vigente y prueba registro, login y el flujo de un plan. Las cuentas y los datos del entorno local no se transfieren automáticamente a RDS.
-
-### Comprobación pública del 15 de noviembre
-
-La API pasó registro, inicio y renovación de sesión, acceso JWT, creación y edición persistidas de un plan, pertenencia del organizador, propuesta de fecha, voto y paginación de notificaciones. La web pasó registro, cookie de renovación HttpOnly/Secure/SameSite=Lax, recarga de sesión y ruta de detalle, creación del plan, propuesta a quince minutos de la hora de Lima y voto. Las vistas de escritorio, tableta y teléfono no presentaron desbordamiento horizontal; el navegador no registró errores de renderizado. Los planes temporales se eliminaron al terminar.
-
-El recorrido público con dos cuentas separadas comprobó unión por código, propuestas compartidas, votos, compromiso de asistencia, permisos de organizador, cierre persistido para ambos usuarios y creación de la notificación de cierre. El plan temporal se eliminó al terminar.
-
-El equipo confirmó además registro desde Safari en iPhone con Wi-Fi desactivado y recepción del correo, apertura de la publicación en Expo Go sin Metro, y guardado y recuperación de la ubicación después de cerrar sesión y volver a entrar. La cámara y el QR se probaron previamente en el iPhone contra el entorno local; los permisos denegados y la revisión visual de todas las pantallas nativas requieren una comprobación separada.
-
-| Endpoint de la API | Media de 10 lecturas |
-|---|---:|
-| `/api/v1/users/me` | 111 ms |
-| `/api/v1/plans?page=0&size=10` | 140 ms |
-| `/api/v1/notifications/page?page=0&size=10` | 202 ms |
-
-Las mediciones fueron secuenciales, después de una lectura de calentamiento, desde la computadora de desarrollo. No constituyen una prueba de carga ni certifican disponibilidad continua. La disponibilidad durante la evaluación debe comprobarse por separado.
-
-### Auditoría inicial de flujos del 15 de noviembre
-
-La auditoría local corrigió el aislamiento entre sesiones, la conservación de notas al cambiar la asistencia, la protección del último administrador, la reutilización de invitaciones, la eliminación explícita de ubicación y los horarios incompletos. También añadió recuperación de rutas que no cargan, conservación de borradores al refrescar, mensajes de invitación con pasos de recuperación y navegación móvil al detalle sin duplicar pantallas. Las estimaciones se invalidan antes de recalcularlas cuando cambia la ubicación o la participación.
-
-`PUT /users/me` admite `removeLocation: true`; omitir la ubicación conserva la existente. Al cambiar el compromiso, omitir `note` conserva la nota y enviar `""` la borra. Reutilizar el código de un plan al que ya se pertenece devuelve esa participación, incluso si el plan dejó de estar abierto; no añade miembros duplicados ni permite que una persona nueva se una a un plan cerrado.
-
-Validación: 97 pruebas backend, 19 pruebas unitarias de contratos/cliente/sesión, ocho recorridos web, dos recorridos del formulario y navegación móvil ejecutados en navegador, TypeScript, compilación web, exportaciones Android/iOS y Expo Doctor 20/20. La auditoría de dependencias de producción no reportó vulnerabilidades. Las pruebas móviles de navegador no sustituyen la comprobación física de cámara, GPS, permisos denegados y SecureStore. Estas correcciones requieren un nuevo despliegue del backend/web y otra publicación móvil; la comprobación pública anterior corresponde a la versión previa.
-
-### Coordinación y reprogramación
-
-La implementación posterior a esa auditoría exige día y lugar para confirmar el plan. La hora es opcional: `startsOn` guarda el día sin inventar una hora; `startsAt` permite añadirla. Las fechas vencidas se excluyen del cierre y del cálculo de acuerdos. Las propuestas de fecha y lugar no pueden mezclar campos de ambos tipos ni tener una hora final anterior o igual a la inicial.
-
-Después de confirmar, cada integrante puede actualizar su asistencia y su nota. Una baja conserva el día, el lugar y las confirmaciones de los demás. Si el conteo cae por debajo del mínimo, el organizador recibe un aviso dentro de QSale; el sistema no reabre ni reduce el mínimo automáticamente.
-
-Una propuesta de reprogramación conserva el acuerdo vigente durante la votación. Una mayoría estricta de votos negativos la rechaza. Una mayoría estricta afirmativa que alcanza además el mínimo permite al organizador aplicar el cambio. Al aplicarlo, los votos sí se convierten en asistencia confirmada, los no en no asistencia y las personas que no votaron quedan pendientes. Cada propuesta termina como aplicada, rechazada, retirada, vencida o reemplazada. Vence al llegar la hora propuesta o, sin hora, al terminar ese día en Lima.
-
-Al mover un plan de varios días se conserva su extensión en días; con horas de inicio y fin definidas se conserva la duración. Cambiar solo el lugar mantiene las fechas. El organizador puede reabrir manualmente para cambiar la duración o decidir de nuevo: se conservan opciones y votos, las asistencias confirmadas pasan a pendientes y se cierran las reprogramaciones activas.
-
-Las recomendaciones comparan los días y franjas registradas, sin exigir disponibilidad ni convertirla en confirmación. Indican cuántos integrantes coinciden, cuántos no registraron disponibilidad y si existe un horario común. Los detalles abiertos se consultan periódicamente para reflejar cambios entre web y móvil sin reemplazar los borradores de formularios.
-
-Estas operaciones están disponibles en ambas interfaces. Las rutas añadidas son:
-
-| Método y ruta bajo `/api/v1` | Operación |
-|---|---|
-| `GET /plans/{id}/date-recommendations` | Consultar hasta cinco días recomendados |
-| `GET /plans/{id}/reschedules` | Consultar propuestas y resultados |
-| `POST /plans/{id}/reschedules` | Proponer día, hora opcional y/o lugar; registra el sí de quien propone |
-| `PUT /plans/{id}/reschedules/{proposalId}/vote` | Responder con `accepted: true` o `false` |
-| `PATCH /plans/{id}/reschedules/{proposalId}/apply` | Aplicar una alternativa elegible, solo organizador |
-| `PATCH /plans/{id}/reschedules/{proposalId}/withdraw` | Retirar una alternativa activa, autor u organizador |
-| `PATCH /plans/{id}/reopen` | Reabrir manualmente un plan confirmado |
-
-El backend aplica Flyway V3 y V4 sobre los datos existentes, con validación del esquema y prueba de conservación de fechas previas. Despliega primero el backend y después los clientes. Comprueba día/lugar elegidos, baja de asistencia y reprogramación desde dos cuentas; solo entonces publica la actualización móvil. AWS permanece detenido durante el desarrollo local.
-
-La revisión también corrige presupuesto vacío guardado como cero en web, notas de 500 caracteres rechazadas por la API, notas del grupo que no se mostraban, indicadores de cierre obsoletos y callbacks del mapa web después de salir de la pantalla. El mapa móvil comunica fallos del proveedor y permite reintentar o usar coordenadas; el escáner permite continuar por código si no abre la cámara.
-
-Validación local: 113 pruebas backend con PostgreSQL, 20 pruebas de lógica/sesión, 11 recorridos web (dos incluyen interacción con Expo), cuatro pruebas móviles de navegador, 81 solicitudes y 100 comprobaciones de Postman, TypeScript, compilación web y exportación iOS/Android. Expo Doctor aprobó 20/20 y la auditoría npm de producción no reportó vulnerabilidades. El equipo confirmó guardar ubicación y usar cámara en iPhone conectado al mismo Wi-Fi, además del acceso web local. Las pruebas de navegador no certifican permisos físicos denegados ni todos los fallos posibles de SecureStore.
-
-La revisión funcional local no equivale a un nuevo despliegue público ni garantiza una nota. Quedan por completar la publicación de estas correcciones, los aportes reales de la tabla inicial y el ensayo del pitch y las preguntas técnicas. GitHub Actions depende de resolver el bloqueo de la cuenta; las pruebas locales no se presentan como CI remoto aprobado.
-
-### Crédito y desconexión de Render
-
-Desarrolla el frontend contra `http://localhost:8080`. Al finalizar pruebas remotas, detén RDS y EC2, verifica ambos estados y termina el laboratorio. El almacenamiento sigue cobrando; [RDS se reinicia automáticamente tras siete días detenida](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html). Revisa la fecha de reinicio en cada sesión. El crédito de US$50 no garantiza disponibilidad continua.
-
-Render es el despliegue anterior. Retirar `render.yaml` no desconecta sus servicios: desactiva **Settings → Auto-Deploy → Off** en Render y retira el acceso de su GitHub App a **QSale**. Conserva los datos antiguos hasta comprobar si necesitas recuperarlos. Consulta [despliegues de Render](https://render.com/docs/deploys) y [acceso a repositorios](https://render.com/docs/git-provider).
+[Web documentada](https://web.98.94.89.19.sslip.io), [API](https://api.98.94.89.19.sslip.io/actuator/health) y [Expo anterior](https://expo.dev/accounts/gonzagl05/projects/qsale/updates/dc186f21-174e-4b8a-95c4-02d23966730a) dependen de la disponibilidad de AWS y la IP vigente. Expo corresponde a `f40ce94`; las correcciones requieren nuevo despliegue y publicación. Antes de evaluar, comprobar migraciones, JWT, CORS y un flujo con dos cuentas desde otra red. Las pruebas locales no certifican latencia pública ni disponibilidad continua.
 
 ## 10. Conclusión
 
-**Logros.** QSale centraliza decisiones antes dispersas y permite cerrar un plan solo con compromiso y viabilidad suficientes. La solución combina reglas de negocio, transacciones, permisos por plan, eventos y servicios externos sin convertir cada fallo de correo o mapas en una caída del flujo principal.
+**Logros.** QSale centraliza decisiones, compromiso y viabilidad. La solución combina reglas de negocio, transacciones, permisos por plan, eventos y servicios externos sin convertir cada fallo de correo o mapas en una caída del flujo principal.
 
 **Aprendizajes clave.** Separar responsabilidades, proteger recursos por membresía y coordinar eventos requiere validar también las integraciones externas.
 
-**Cierre pendiente.** Completar la revisión visual de todas las pantallas nativas y los permisos denegados, la disponibilidad durante la evaluación, los aportes reales del equipo y el ensayo de exposición. Quedan como mejoras la observabilidad y los respaldos duraderos.
+**Cierre pendiente.** Completar la revisión visual de todas las pantallas nativas y los permisos denegados, la disponibilidad durante la evaluación, la publicación de la versión corregida y su validación pública. El equipo debe contrastar los aportes resumidos en Git con su trabajo compartido.
 
 ## 11. Apéndices
 
