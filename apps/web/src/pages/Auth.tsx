@@ -20,6 +20,7 @@ export default function Auth() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<SignUpInput>({
+    mode: 'onTouched',
     resolver: zodResolver(registering ? signUpSchema : signInSchema) as never,
   });
   if (loading) return <Loading label="Preparando QSale…" />;

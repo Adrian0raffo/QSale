@@ -47,6 +47,7 @@ export default function PlanForm({ editing = false }: { editing?: boolean }) {
     setError,
     formState: { errors, isSubmitting, dirtyFields },
   } = useForm<PlanInput>({
+    mode: 'onTouched',
     resolver: zodResolver(planSchema),
     defaultValues: {
       name: '',

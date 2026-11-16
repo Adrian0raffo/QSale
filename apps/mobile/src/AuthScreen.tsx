@@ -20,6 +20,7 @@ export default function AuthScreen({ registering = false }: { registering?: bool
     handleSubmit,
     formState: { isSubmitting },
   } = useForm<SignUpInput>({
+    mode: 'onTouched',
     resolver: zodResolver(registering ? signUpSchema : signInSchema) as never,
     defaultValues: { name: '', email: '', password: '' },
   });

@@ -1,15 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
-  Check,
   Copy,
-  MapPin,
   Pencil,
   Plus,
   Share2,
-  ThumbsUp,
   Trash2,
   UserPlus,
   UsersRound,
@@ -21,23 +18,13 @@ import {
   attendanceSummary,
   canRespond,
   isOrganizer,
-  dateInputError,
-  dateOptionInput,
   formatOptionDate,
-  validDay,
-  todayInLima,
   canManagePlan,
   commitmentLabels,
   formatDate,
   formatMoney,
-  locationSchema,
   planTypeLabels,
-  type AvailabilityInput,
   type CommitmentStatus,
-  type Location,
-  type OptionInput,
-  type Participant,
-  type PlanDetail as Plan,
   type PlanOption,
 } from '@qsale/contracts';
 import { DateRecommendations, ReschedulePanel } from '../Coordination';
@@ -53,354 +40,13 @@ import {
   Field,
   Loading,
   PageHeading,
-  Skeleton,
   StatusBadge,
   useToast,
 } from '../ui';
-import { LocationPicker, MapView, type MapPoint } from '../Map';
-
-function DataSection<T>({
-  query,
-  children,
-}: {
-  query: {
-    isPending: boolean;
-    isError: boolean;
-    error: Error | null;
-    data: T | undefined;
-    refetch: () => unknown;
-  };
-  children: (value: T) => ReactNode;
-}) {
-  return query.isPending ? (
-    <Skeleton rows={2} />
-  ) : query.isError ? (
-    <ErrorState error={query.error!} retry={() => void query.refetch()} />
-  ) : (
-    <>{children(query.data!)}</>
-  );
-}
-export function ParticipantRow({
-  item,
-  commitment,
-  note,
-  canRemove,
-  onRemove,
-  busy,
-}: {
-  item: Participant;
-  commitment?: CommitmentStatus;
-  note?: string | null;
-  canRemove: boolean;
-  onRemove: () => void;
-  busy: boolean;
-}) {
-  return (
-    <div className="participant-row">
-      <span className="avatar">{item.userName.slice(0, 1).toUpperCase()}</span>
-      <div>
-        <strong>{item.userName}</strong>
-        <small>
-          {item.role === 'ORGANIZER'
-            ? 'Organiza el plan'
-            : item.status === 'INVITED'
-              ? 'Invitación pendiente'
-              : 'Parte del grupo'}
-        </small>
-        {note && <small>Nota: {note}</small>}
-      </div>
-      <span className={'participant-response ' + (commitment ?? '')}>
-        {item.status === 'INVITED'
-          ? 'Aún no se une'
-          : commitment
-            ? commitmentLabels[commitment]
-            : 'Sin respuesta'}
-      </span>
-      {canRemove && (
-        <Button
-          variant="quiet"
-          aria-label={'Retirar a ' + item.userName}
-          busy={busy}
-          onClick={onRemove}
-        >
-          <Trash2 size={17} />
-        </Button>
-      )}
-    </div>
-  );
-}
-export function OptionCard({
-  option,
-  canVote,
-  canDelete,
-  onVote,
-  onDelete,
-  busy,
-}: {
-  option: PlanOption;
-  canVote: boolean;
-  canDelete: boolean;
-  onVote: () => void;
-  onDelete: () => void;
-  busy: boolean;
-}) {
-  return (
-    <article className={'option-card ' + (option.selected ? 'selected' : '')}>
-      <div className="option-title">
-        {option.type === 'PLACE' ? <MapPin size={20} /> : <CalendarDays size={20} />}
-        <h3>{option.label}</h3>
-        {option.selected && (
-          <span className="badge good">
-            <Check size={14} />
-            Elegida
-          </span>
-        )}
-      </div>
-      {option.description && <p>{option.description}</p>}
-      {option.type === 'DATE' ? (
-        <p className="option-main">{formatOptionDate(option)}</p>
-      ) : (
-        <>
-          <p className="option-main">{option.location?.address ?? 'Ubicación en el mapa'}</p>
-          {option.estimateStatus === 'READY' ? (
-            <p className="travel-estimate">
-              Promedio del grupo: {option.avgDistanceKm?.toFixed(1)} km ·{' '}
-              {Math.round(option.avgTravelMinutes ?? 0)} min
-              <small>
-                {option.estimateSource === 'ROUTING'
-                  ? 'Estimación de rutas'
-                  : option.estimateSource === 'HAVERSINE'
-                    ? 'Aproximación en línea recta; no es una ruta de tránsito'
-                    : 'Estimación guardada; origen no disponible'}
-              </small>
-            </p>
-          ) : (
-            <p className="form-hint">
-              {option.estimateStatus === 'PENDING'
-                ? 'Calculando estimación…'
-                : 'Sin estimación: aún faltan ubicaciones del grupo.'}
-            </p>
-          )}
-        </>
-      )}
-      <div className="option-footer">
-        <span>
-          {option.voteCount} {option.voteCount === 1 ? 'voto' : 'votos'} · Por{' '}
-          {option.proposedByName}
-        </span>
-        <div className="actions">
-          {canDelete && (
-            <Button
-              variant="quiet"
-              aria-label={'Eliminar propuesta ' + option.label}
-              disabled={busy}
-              onClick={onDelete}
-            >
-              <Trash2 size={16} />
-            </Button>
-          )}
-          {canVote && (
-            <Button
-              variant={option.hasVoted ? 'primary' : 'secondary'}
-              busy={busy}
-              onClick={onVote}
-              aria-pressed={option.hasVoted}
-            >
-              <ThumbsUp size={17} />
-              {option.hasVoted ? 'Quitar mi voto' : 'Votar'}
-            </Button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function OptionForm({ planId, onClose }: { planId: number; onClose: () => void }) {
-  const [type, setType] = useState<'DATE' | 'PLACE'>('DATE');
-  const [label, setLabel] = useState('');
-  const [description, setDescription] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [location, setLocation] = useState<Location | null>(null);
-  const [error, setError] = useState('');
-  const action = useAction(
-    (data: OptionInput) => api.createOption(planId, data),
-    'Propuesta lista para recibir votos.',
-    onClose,
-  );
-  return (
-    <form
-      className="inline-form"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError('');
-        if (label.trim().length < 3 || label.trim().length > 120) {
-          setError('El título necesita entre 3 y 120 caracteres.');
-          return;
-        }
-        const dateError = dateInputError(start, startTime, end, endTime);
-        if (type === 'DATE' && dateError) {
-          setError(dateError);
-          return;
-        }
-        if (type === 'PLACE' && !locationSchema.safeParse(location).success) {
-          setError('Elige una ubicación válida para el lugar.');
-          return;
-        }
-        action.mutate({
-          type,
-          label: label.trim(),
-          description,
-          ...(type === 'DATE'
-            ? dateOptionInput(start, startTime, end, endTime)
-            : { location: location! }),
-        });
-      }}
-    >
-      <h3>Una nueva propuesta</h3>
-      <div className="segmented" aria-label="Tipo de propuesta">
-        <button type="button" aria-pressed={type === 'DATE'} onClick={() => setType('DATE')}>
-          <CalendarDays size={17} />
-          Fecha
-        </button>
-        <button type="button" aria-pressed={type === 'PLACE'} onClick={() => setType('PLACE')}>
-          <MapPin size={17} />
-          Lugar
-        </button>
-      </div>
-      <Field
-        label="Título de la propuesta"
-        value={label}
-        maxLength={120}
-        onChange={(event) => setLabel(event.target.value)}
-        placeholder={
-          type === 'DATE' ? 'Por ejemplo: Sábado por la tarde' : 'Por ejemplo: Parque Kennedy'
-        }
-      />
-      <Field
-        label="Un detalle para el grupo (opcional)"
-        value={description}
-        maxLength={500}
-        onChange={(event) => setDescription(event.target.value)}
-      />
-      {type === 'DATE' ? (
-        <div className="form-row">
-          <Field
-            label="Día de inicio"
-            type="date"
-            value={start}
-            onChange={(event) => setStart(event.target.value)}
-          />
-          <Field
-            label="Hora de inicio (Lima, opcional)"
-            type="time"
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
-          <Field
-            label="Hora final (opcional)"
-            type="time"
-            value={endTime}
-            onChange={(event) => setEndTime(event.target.value)}
-          />
-          <Field
-            label="Día final (opcional)"
-            type="date"
-            value={end}
-            onChange={(event) => setEnd(event.target.value)}
-          />
-        </div>
-      ) : (
-        <LocationPicker value={location} onChange={setLocation} />
-      )}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="actions end">
-        <Button type="button" variant="secondary" disabled={action.isPending} onClick={onClose}>
-          Volver
-        </Button>
-        <Button busy={action.isPending}>Publicar propuesta</Button>
-      </div>
-    </form>
-  );
-}
-function AvailabilityForm({ planId }: { planId: number }) {
-  const [date, setDate] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
-  const [error, setError] = useState('');
-  const action = useAction(
-    (input: AvailabilityInput) => api.addAvailability(planId, input),
-    'Tu disponibilidad está guardada.',
-    () => {
-      setDate('');
-      setStart('');
-      setEnd('');
-    },
-  );
-  return (
-    <form
-      className="inline-form"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError('');
-        const today = todayInLima();
-        if (!validDay(date) || date < today) {
-          setError('Elige hoy o una fecha futura.');
-          return;
-        }
-        if (Boolean(start) !== Boolean(end) || (start && end <= start)) {
-          setError(
-            'Completa ambas horas y coloca el final después del inicio, o deja ambas vacías.',
-          );
-          return;
-        }
-        action.mutate({
-          availableDate: date,
-          ...(start ? { startTime: start, endTime: end } : {}),
-        });
-      }}
-    >
-      <h3>¿Cuándo tienes un espacio?</h3>
-      <p>Esto ayuda a calcular la viabilidad; no sustituye tu confirmación de asistencia.</p>
-      <div className="form-row three">
-        <Field
-          label="Día"
-          type="date"
-          value={date}
-          onChange={(event) => setDate(event.target.value)}
-        />
-        <Field
-          label="Desde (opcional)"
-          type="time"
-          value={start}
-          onChange={(event) => setStart(event.target.value)}
-        />
-        <Field
-          label="Hasta (opcional)"
-          type="time"
-          value={end}
-          onChange={(event) => setEnd(event.target.value)}
-        />
-      </div>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <Button busy={action.isPending}>Añadir disponibilidad</Button>
-    </form>
-  );
-}
-
+import { MapView, type MapPoint } from '../Map';
+import { DataSection, ParticipantRow, OptionCard } from './PlanDetailCards';
+import { OptionForm, AvailabilityForm } from './PlanDetailForms';
+export { ParticipantRow, OptionCard } from './PlanDetailCards';
 export default function PlanDetail() {
   const { id } = useParams();
   const planId = Number(id);
@@ -490,7 +136,8 @@ export default function PlanDetail() {
   );
   if (!valid) return <ErrorState error={new Error('El enlace del plan no es válido.')} />;
   if (query.isPending) return <Loading />;
-  if (query.isError) return <ErrorState error={query.error} retry={() => void query.refetch()} />;
+  if (query.isError)
+    return <ErrorState error={query.error} retry={() => void query.refetch()} />;
   const plan = query.data;
   const manage = canManagePlan(plan, user);
   const contribute = canContribute(plan);
@@ -574,12 +221,14 @@ export default function PlanDetail() {
             ?.filter((option) => option.selected)
             .map((option) => (
               <p key={option.id}>
-                <strong>{option.type === 'DATE' ? formatOptionDate(option) : option.label}</strong>
+                <strong>
+                  {option.type === 'DATE' ? formatOptionDate(option) : option.label}
+                </strong>
               </p>
             ))}
           <p>
-            Si alguien no puede asistir, el día y el lugar se conservan. Solo quien organiza puede
-            aplicar una reprogramación aprobada o reabrir el plan.
+            Si alguien no puede asistir, el día y el lugar se conservan. Solo quien organiza
+            puede aplicar una reprogramación aprobada o reabrir el plan.
           </p>
         </section>
       )}
@@ -695,12 +344,14 @@ export default function PlanDetail() {
                           key={item.id}
                           item={item}
                           commitment={
-                            commitments.data?.find((response) => response.userId === item.userId)
-                              ?.status
+                            commitments.data?.find(
+                              (response) => response.userId === item.userId,
+                            )?.status
                           }
                           note={
-                            commitments.data?.find((response) => response.userId === item.userId)
-                              ?.note
+                            commitments.data?.find(
+                              (response) => response.userId === item.userId,
+                            )?.note
                           }
                           canRemove={
                             plan.status === 'OPEN' &&
@@ -727,7 +378,10 @@ export default function PlanDetail() {
                   )}
                 </DataSection>
                 {commitments.isError && (
-                  <ErrorState error={commitments.error} retry={() => void commitments.refetch()} />
+                  <ErrorState
+                    error={commitments.error}
+                    retry={() => void commitments.refetch()}
+                  />
                 )}
               </>
             )}
