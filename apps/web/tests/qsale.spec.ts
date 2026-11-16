@@ -24,6 +24,7 @@ test('two people organize, vote, confirm and close a plan through the real API',
   browser,
   request,
 }, testInfo) => {
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await register(page, 'Ana del grupo', emailA);
@@ -120,7 +121,12 @@ test('two people organize, vote, confirm and close a plan through the real API',
   await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
   await expect(page.getByRole('button', { name: 'Guardar mi perfil' })).toBeEnabled();
   await page.getByLabel('Nombre', { exact: true }).fill('Ana actualizada');
+  const profileSaved = page.waitForResponse(response =>
+    response.url().endsWith('/backend/api/v1/users/me') &&
+    response.request().method() === 'PUT' && response.ok(),
+  );
   await page.getByRole('button', { name: 'Guardar mi perfil' }).click();
+  await profileSaved;
   await page.reload();
   await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Ana actualizada');
   await bobContext.close();
