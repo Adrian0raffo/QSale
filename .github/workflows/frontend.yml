@@ -105,6 +105,7 @@ jobs:
           name: failed-user-flows
           path: |
             test-results/
+            apps/web/test-results/
             apps/mobile/test-results/
             ${{ runner.temp }}/qsale-api.log
           retention-days: 3
