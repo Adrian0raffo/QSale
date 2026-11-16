@@ -1,6 +1,7 @@
 package com.example.qsale.plan.domain;
 
 import com.example.qsale.exceptions.InvalidOperationException;
+import com.example.qsale.exceptions.ConflictException;
 import com.example.qsale.option.domain.PlanOptionService;
 import com.example.qsale.participant.domain.ParticipantRole;
 import com.example.qsale.participant.domain.ParticipationStatus;
@@ -62,6 +63,7 @@ public class PlanService {
         User user = userService.getCurrentUser();
 
         Plan plan = modelMapper.map(dto, Plan.class);
+        plan.setVersion(null);
         plan.setCreator(user);
         plan.setInviteCode(generateInviteCode());
         plan.addParticipant(createOrganizer(plan, user));
@@ -104,8 +106,11 @@ public class PlanService {
         validateDates(dto);
         Plan plan = planAccessService.lockAsOrganizer(planId, userService.getCurrentUser());
         planAccessService.requireOpen(plan);
+        if (dto.getVersion() == null || !dto.getVersion().equals(plan.getVersion())) {
+            throw new ConflictException("The plan changed. Reload its latest version before saving your draft");
+        }
         modelMapper.map(dto, plan);
-        PlanDetailDto response = toDetail(planRepository.save(plan), userService.getCurrentUser().getId());
+        PlanDetailDto response = toDetail(planRepository.saveAndFlush(plan), userService.getCurrentUser().getId());
         eventPublisher.publishEvent(new PlanChangedEvent(this, planId));
         eventPublisher.publishEvent(new PlanUpdatedEvent(this, planId));
         return response;

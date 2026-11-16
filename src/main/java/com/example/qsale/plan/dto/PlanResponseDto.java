@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class PlanResponseDto {
     private Long id;
+    private Long version;
     private String name;
     private PlanType type;
     private PlanStatus status;

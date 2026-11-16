@@ -137,6 +137,6 @@ class FeasibilityServiceTest {
     private Availability buildAvailability(Plan plan, Long userId) {
         User user = new User("User " + userId, userId + "@utec.edu.pe", "hashed", Role.USER);
         user.setId(userId);
-        return new Availability(plan, user, LocalDate.now().plusDays(3), null, null);
+        return new Availability(plan, user, LocalDate.now().plusDays(10), null, null);
     }
 }

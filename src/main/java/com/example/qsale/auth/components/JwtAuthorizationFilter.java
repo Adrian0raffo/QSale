@@ -1,6 +1,7 @@
 package com.example.qsale.auth.components;
 
 import com.example.qsale.user.domain.UserService;
+import com.example.qsale.auth.domain.AuthSessionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,7 @@ import java.io.IOException;
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AuthSessionService sessions;
     private final UserService userService;
     private final SecurityExceptionHandler securityExceptionHandler;
 
@@ -32,7 +34,8 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
         if (StringUtils.hasText(authHeader) && StringUtils.startsWithIgnoreCase(authHeader, "Bearer ")) {
             String token = authHeader.substring(7);
-            if (jwtService.isAccessTokenValid(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (jwtService.isAccessTokenValid(token) && sessions.isActive(token)
+                    && SecurityContextHolder.getContext().getAuthentication() == null) {
                 try {
                     authenticate(request, jwtService.extractUsername(token));
                 } catch (AuthenticationException ex) {

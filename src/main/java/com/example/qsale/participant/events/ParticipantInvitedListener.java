@@ -13,8 +13,7 @@ public class ParticipantInvitedListener {
 
     private final NotificationService notificationService;
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void notifyInvitation(ParticipantInvitedEvent event) {
         notificationService.notifyInvitation(event.getPlanId(), event.getUserId());
     }

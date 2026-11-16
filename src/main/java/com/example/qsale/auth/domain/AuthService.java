@@ -30,7 +30,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final AuthSessionService sessions;
     private final AuthenticationManager authenticationManager;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -49,6 +49,7 @@ public class AuthService {
         return buildTokens(user);
     }
 
+    @Transactional
     public TokenResponse signIn(SignInRequest request) {
         String email = request.getEmail().toLowerCase(Locale.ROOT);
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.getPassword()));
@@ -56,16 +57,14 @@ public class AuthService {
     }
 
     public TokenResponse refresh(RefreshTokenRequest request) {
-        if (!jwtService.isRefreshTokenValid(request.getRefreshToken())) {
-            throw new UnauthorizedException("Refresh token is invalid or expired");
-        }
-        String email = jwtService.extractUsername(request.getRefreshToken());
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UnauthorizedException("Refresh token is invalid or expired"));
-        return buildTokens(user);
+        return sessions.refresh(request.getRefreshToken());
+    }
+
+    public void signOut(RefreshTokenRequest request) {
+        sessions.revoke(request.getRefreshToken());
     }
 
     private TokenResponse buildTokens(User user) {
-        return new TokenResponse(jwtService.generateAccessToken(user), jwtService.generateRefreshToken(user));
+        return sessions.issue(user);
     }
 }

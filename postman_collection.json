@@ -30,6 +30,18 @@
           "pm.collectionVariables.set(\"nextRescheduleDate\", rescheduleDay.toISOString().slice(0, 10));"
         ]
       }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "try {",
+          "  const data = pm.response.json();",
+          "  if (typeof data.version === \"number\") pm.collectionVariables.set(\"planVersion\", data.version);",
+          "} catch (_) {}"
+        ]
+      }
     }
   ],
   "variable": [
@@ -136,6 +148,15 @@
     {
       "key": "nextRescheduleDate",
       "value": ""
+    },
+    {
+      "key": "planVersion",
+      "value": "0"
+    },
+    {
+      "key": "backgroundJobId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1335,7 +1356,7 @@
             "description": "Solo el organizador y solo si el plan está OPEN. Publica PlanChangedEvent (recalcula el semáforo) y PlanUpdatedEvent (avisa a los participantes).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
+              "raw": "{\n  \"version\": {{planVersion}},\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1358,7 +1379,7 @@
                 "description": "Solo el organizador y solo si el plan está OPEN. Publica PlanChangedEvent (recalcula el semáforo) y PlanUpdatedEvent (avisa a los participantes).",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
+                  "raw": "{\n  \"version\": {{planVersion}},\n  \"name\": \"Cena viernes\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"type\": \"DINNER\",\n  \"budget\": 80,\n  \"minParticipants\": 2,\n  \"tentativeStartDate\": \"{{futureDate}}\",\n  \"tentativeEndDate\": \"{{futureDate}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1559,7 +1580,52 @@
                 }
               }
             }
-          }
+          },
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/plans/{{planId}}/options",
+                "description": "Incluso una cuenta ADMIN debe aceptar su invitacion antes de contribuir como participante.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"type\":\"DATE\",\"label\":\"Invitacion pendiente\",\"startsAt\":\"{{futureDate}}T18:00:00\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:28:06.0101912\",\n  \"status\": 403,\n  \"error\": \"Forbidden\",\n  \"message\": \"Access Denied\",\n  \"path\": \"/api/v1/plans/1/options\"\n}"
+            }
+          ]
         },
         {
           "id": "qsale-020",
@@ -3514,7 +3580,38 @@
                 }
               ]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/close",
+                "description": "Ser participante JOINED no otorga permisos de organizador. La autorizacion se verifica antes del estado del plan.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{guestToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:28:52.8525974\",\n  \"status\": 403,\n  \"error\": \"Forbidden\",\n  \"message\": \"Access Denied\",\n  \"path\": \"/api/v1/plans/1/close\"\n}"
+            }
+          ]
         },
         {
           "name": "403 - Usuario no puede promoverse a administrador",
@@ -3558,7 +3655,52 @@
                 }
               }
             }
-          }
+          },
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/admin/users/{{guestUserId}}/role",
+                "description": "Cambiar roles requiere ADMIN tanto en la ruta como en el servicio.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{guestToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"role\":\"ADMIN\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:28:53.0173277\",\n  \"status\": 403,\n  \"error\": \"Forbidden\",\n  \"message\": \"Access Denied\",\n  \"path\": \"/api/v1/admin/users/3/role\"\n}"
+            }
+          ]
         },
         {
           "name": "401 - Refresh token no sirve para acceder a recursos",
@@ -3588,7 +3730,38 @@
                 }
               ]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/users/me",
+                "description": "El filtro rechaza tokens de tipo refresh en endpoints que requieren un token de acceso.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{refreshToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:28:53.1922782\",\n  \"status\": 401,\n  \"error\": \"Unauthorized\",\n  \"message\": \"Full authentication is required to access this resource\",\n  \"path\": \"/api/v1/users/me\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -3616,7 +3789,28 @@
             "header": [],
             "url": "{{baseUrl}}/plans?page=0&size=100&search=Cena&sort=name,asc",
             "description": "Búsqueda en servidor por nombre/descripción, orden permitido y paginación de hasta 100 elementos. Solo devuelve planes del usuario; la respuesta incluye su rol y estado de participación."
-          }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/plans?page=0&size=100&search=Cena&sort=name,asc",
+                "description": "Búsqueda en servidor por nombre/descripción, orden permitido y paginación de hasta 100 elementos. Solo devuelve planes del usuario; la respuesta incluye su rol y estado de participación."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"content\": [\n    {\n      \"agreementVersion\": 1,\n      \"budget\": 60.0,\n      \"createdAt\": \"2026-11-15T19:28:04.423677\",\n      \"creatorName\": \"Ana Torres\",\n      \"currentUserParticipationStatus\": \"JOINED\",\n      \"currentUserRole\": \"ORGANIZER\",\n      \"feasibilityScore\": 93,\n      \"feasibilityStatus\": \"READY_TO_CLOSE\",\n      \"id\": 1,\n      \"minParticipants\": 2,\n      \"name\": \"Cena viernes\",\n      \"status\": \"CLOSED\",\n      \"tentativeEndDate\": \"2026-11-30\",\n      \"tentativeStartDate\": \"2026-11-30\",\n      \"type\": \"DINNER\",\n      \"version\": 1\n    }\n  ],\n  \"page\": 0,\n  \"size\": 100,\n  \"totalElements\": 1,\n  \"totalPages\": 1\n}"
+            }
+          ]
         },
         {
           "name": "Notificaciones: segundo endpoint paginado",
@@ -3638,7 +3832,28 @@
             "header": [],
             "url": "{{baseUrl}}/notifications/page?page=0&size=100",
             "description": "Segundo listado paginado para los frontends. unreadCount incluye todas las notificaciones no leídas del destinatario, no solo la página. El endpoint original sin /page conserva su respuesta de lista."
-          }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/notifications/page?page=0&size=100",
+                "description": "Segundo listado paginado para los frontends. unreadCount incluye todas las notificaciones no leídas del destinatario, no solo la página. El endpoint original sin /page conserva su respuesta de lista."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"content\": [\n    {\n      \"createdAt\": \"2026-11-15T19:28:47.247653\",\n      \"id\": 3,\n      \"message\": \"El plan Cena viernes quedó confirmado\",\n      \"planId\": 1,\n      \"readAt\": \"2026-11-15T19:28:49.801923\",\n      \"status\": \"SENT\",\n      \"type\": \"PLAN_CLOSED\"\n    },\n    {\n      \"createdAt\": \"2026-11-15T19:28:46.81622\",\n      \"id\": 2,\n      \"message\": \"El plan Cena viernes alcanzó el mínimo de confirmados y está listo para cerrarse\",\n      \"planId\": 1,\n      \"readAt\": null,\n      \"status\": \"SENT\",\n      \"type\": \"MIN_PARTICIPANTS_REACHED\"\n    }\n  ],\n  \"page\": 0,\n  \"size\": 100,\n  \"totalElements\": 2,\n  \"totalPages\": 1,\n  \"unreadCount\": 1\n}"
+            }
+          ]
         },
         {
           "name": "Notificaciones: filtro de no leídas antes de paginar",
@@ -3660,7 +3875,28 @@
             "header": [],
             "url": "{{baseUrl}}/notifications/page?page=0&size=1&unreadOnly=true",
             "description": "El filtro se aplica al conjunto completo antes de calcular totales y página."
-          }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/notifications/page?page=0&size=1&unreadOnly=true",
+                "description": "El filtro se aplica al conjunto completo antes de calcular totales y página."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"content\": [\n    {\n      \"createdAt\": \"2026-11-15T19:28:46.81622\",\n      \"id\": 2,\n      \"message\": \"El plan Cena viernes alcanzó el mínimo de confirmados y está listo para cerrarse\",\n      \"planId\": 1,\n      \"readAt\": null,\n      \"status\": \"SENT\",\n      \"type\": \"MIN_PARTICIPANTS_REACHED\"\n    }\n  ],\n  \"page\": 0,\n  \"size\": 1,\n  \"totalElements\": 1,\n  \"totalPages\": 1,\n  \"unreadCount\": 1\n}"
+            }
+          ]
         },
         {
           "name": "Opciones: voto propio y procedencia de estimaciones",
@@ -3683,7 +3919,28 @@
             "header": [],
             "url": "{{baseUrl}}/plans/{{planId}}/options",
             "description": "hasVoted corresponde únicamente al usuario autenticado. estimateSource distingue rutas, aproximación Haversine y valores anteriores cuyo origen no se conoce; estimateUpdatedAt utiliza una fecha UTC cuando se recalcula."
-          }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/options",
+                "description": "hasVoted corresponde únicamente al usuario autenticado. estimateSource distingue rutas, aproximación Haversine y valores anteriores cuyo origen no se conoce; estimateUpdatedAt utiliza una fecha UTC cuando se recalcula."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"avgDistanceKm\": null,\n    \"avgTravelMinutes\": null,\n    \"description\": null,\n    \"endsAt\": \"2026-11-30T23:00:00\",\n    \"endsOn\": \"2026-11-30\",\n    \"estimateSource\": null,\n    \"estimateStatus\": \"NOT_APPLICABLE\",\n    \"estimateUpdatedAt\": null,\n    \"hasVoted\": true,\n    \"id\": 1,\n    \"label\": \"Viernes 8 pm\",\n    \"location\": null,\n    \"proposedByName\": \"Ana Torres\",\n    \"score\": 80,\n    \"selected\": true,\n    \"startsAt\": \"2026-11-30T20:00:00\",\n    \"startsOn\": \"2026-11-30\",\n    \"type\": \"DATE\",\n    \"voteCount\": 2\n  },\n  {\n    \"avgDistanceKm\": 1.63,\n    \"avgTravelMinutes\": 4,\n    \"description\": null,\n    \"endsAt\": null,\n    \"endsOn\": null,\n    \"estimateSource\": \"HAVERSINE\",\n    \"estimateStatus\": \"READY\",\n    \"estimateUpdatedAt\": \"2026-11-16T00:28:07.490859Z\",\n    \"hasVoted\": true,\n    \"id\": 2,\n    \"label\": \"La Lucha Barranco\",\n    \"location\": {\n      \"address\": \"Av. Pedro de Osma 110\",\n      \"district\": \"Barranco\",\n      \"latitude\": -12.1486,\n      \"longitude\": -77.0219\n    },\n    \"proposedByName\": \"Bob Diaz\",\n    \"score\": 58,\n    \"selected\": true,\n    \"startsAt\": null,\n    \"startsOn\": null,\n    \"type\": \"PLACE\",\n    \"voteCount\": 1\n  }\n]"
+            }
+          ]
         },
         {
           "name": "400 - Orden de planes no permitido",
@@ -3703,7 +3960,28 @@
             "header": [],
             "url": "{{baseUrl}}/plans?sort=creator.password,asc",
             "description": "El servidor permite ordenar solo por campos explícitamente autorizados."
-          }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/plans?sort=creator.password,asc",
+                "description": "El servidor permite ordenar solo por campos explícitamente autorizados."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:28:54.4243787\",\n  \"status\": 400,\n  \"error\": \"Bad Request\",\n  \"message\": \"sort must use an allowed field and asc or desc\",\n  \"path\": \"/api/v1/plans\"\n}"
+            }
+          ]
         },
         {
           "name": "400 - Página de notificaciones inválida",
@@ -3723,7 +4001,28 @@
             "header": [],
             "url": "{{baseUrl}}/notifications/page?page=-1&size=10",
             "description": "Las páginas negativas no se ejecutan ni exponen notificaciones de otros destinatarios."
-          }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/notifications/page?page=-1&size=10",
+                "description": "Las páginas negativas no se ejecutan ni exponen notificaciones de otros destinatarios."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:28:54.5833151\",\n  \"status\": 400,\n  \"error\": \"Bad Request\",\n  \"message\": \"page must be non-negative and size must be positive\",\n  \"path\": \"/api/v1/notifications/page\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -3736,7 +4035,8 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations"
+            "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations",
+            "description": "Compara disponibilidades vigentes de integrantes unidos. Devuelve hasta cinco días con cobertura, datos faltantes y coincidencia horaria. Es una recomendación; no cambia el acuerdo ni confirma asistencia. Requiere pertenecer al plan."
           },
           "event": [
             {
@@ -3749,7 +4049,27 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/date-recommendations",
+                "description": "Compara disponibilidades vigentes de integrantes unidos. Devuelve hasta cinco días con cobertura, datos faltantes y coincidencia horaria. Es una recomendación; no cambia el acuerdo ni confirma asistencia. Requiere pertenecer al plan."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"date\": \"2026-11-30\",\n    \"availableParticipants\": 2,\n    \"totalParticipants\": 2,\n    \"unknownParticipants\": 0,\n    \"allParticipantsAvailable\": true,\n    \"timeCompatible\": true,\n    \"commonStartTime\": \"19:00:00\",\n    \"commonEndTime\": \"23:30:00\"\n  }\n]"
+            }
+          ]
         },
         {
           "name": "Actualizar asistencia tras confirmar (invitado)",
@@ -3780,7 +4100,8 @@
                   "type": "string"
                 }
               ]
-            }
+            },
+            "description": "Actualiza la asistencia individual después del cierre. Conserva el día, el lugar y las confirmaciones de los demás. Si el grupo pierde el mínimo, genera un aviso para quien organiza. Requiere participación aceptada; un plan cancelado rechaza cambios."
           },
           "event": [
             {
@@ -3793,14 +4114,59 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/plans/{{planId}}/commitments/me",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"CANT_GO\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{guestToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": "Actualiza la asistencia individual después del cierre. Conserva el día, el lugar y las confirmaciones de los demás. Si el grupo pierde el mínimo, genera un aviso para quien organiza. Requiere participación aceptada; un plan cancelado rechaza cambios."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 2,\n  \"note\": \"Depende de mi horario de trabajo\",\n  \"respondedAt\": \"2026-11-15T19:28:55.0463143\",\n  \"status\": \"CANT_GO\",\n  \"userId\": 3,\n  \"userName\": \"Bob Diaz\"\n}"
+            }
+          ]
         },
         {
           "name": "La baja conserva el acuerdo",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}"
+            "url": "{{baseUrl}}/plans/{{planId}}",
+            "description": "Verifica que la baja de un asistente no reabre automáticamente el plan ni borra su acuerdo. El estado sigue CLOSED y agreementVersion identifica la versión vigente. Requiere pertenecer al plan."
           },
           "event": [
             {
@@ -3814,7 +4180,27 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}",
+                "description": "Verifica que la baja de un asistente no reabre automáticamente el plan ni borra su acuerdo. El estado sigue CLOSED y agreementVersion identifica la versión vigente. Requiere pertenecer al plan."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"agreementVersion\": 1,\n  \"budget\": 60.0,\n  \"closedAt\": \"2026-11-15T19:28:47.20132\",\n  \"createdAt\": \"2026-11-15T19:28:04.423677\",\n  \"creatorId\": 2,\n  \"creatorName\": \"Ana Torres\",\n  \"currentUserParticipationStatus\": \"JOINED\",\n  \"currentUserRole\": \"ORGANIZER\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"feasibilityScore\": 93,\n  \"feasibilityStatus\": \"READY_TO_CLOSE\",\n  \"id\": 1,\n  \"inviteCode\": \"11DAD266\",\n  \"minParticipants\": 2,\n  \"name\": \"Cena viernes\",\n  \"status\": \"CLOSED\",\n  \"tentativeEndDate\": \"2026-11-30\",\n  \"tentativeStartDate\": \"2026-11-30\",\n  \"type\": \"DINNER\",\n  \"version\": 1\n}"
+            }
+          ]
         },
         {
           "name": "Proponer otro día sin imponer una hora",
@@ -3835,7 +4221,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Propone cambiar un plan confirmado. El día y el lugar actuales se conservan mientras se vota; la hora es opcional. El autor registra automáticamente un voto afirmativo. Requiere participación aceptada; devuelve 400 si no cambia el acuerdo o el día ya pasó."
           },
           "event": [
             {
@@ -3849,14 +4236,49 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"date\": \"{{rescheduleDate}}\",\n  \"reason\": \"Otro día que funciona al grupo\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Propone cambiar un plan confirmado. El día y el lugar actuales se conservan mientras se vota; la hora es opcional. El autor registra automáticamente un voto afirmativo. Requiere participación aceptada; devuelve 400 si no cambia el acuerdo o el día ya pasó."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 1,\n  \"planId\": 1,\n  \"createdById\": 2,\n  \"createdByName\": \"Ana Torres\",\n  \"baseAgreementVersion\": 1,\n  \"date\": \"2026-12-01\",\n  \"time\": null,\n  \"endDate\": \"2026-12-01\",\n  \"endTime\": null,\n  \"placeOptionId\": 2,\n  \"placeLabel\": \"La Lucha Barranco\",\n  \"location\": {\n    \"address\": \"Av. Pedro de Osma 110\",\n    \"district\": null,\n    \"latitude\": -12.1486,\n    \"longitude\": -77.0219\n  },\n  \"reason\": \"Otro día que funciona al grupo\",\n  \"status\": \"VOTING\",\n  \"yesVotes\": 1,\n  \"noVotes\": 0,\n  \"totalVoters\": 2,\n  \"requiredVotes\": 2,\n  \"myVote\": true,\n  \"canApply\": false,\n  \"canWithdraw\": true,\n  \"createdAt\": \"2026-11-16T00:28:55.616518200Z\",\n  \"expiresAt\": \"2026-12-02T05:00:00Z\"\n}"
+            }
+          ]
         },
         {
           "name": "Consultar propuestas e historial",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reschedules"
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+            "description": "Lista las propuestas y su historial, votos efectivos, voto propio, mínimo requerido, vencimiento y acciones autorizadas. Evalúa propuestas vencidas o reemplazadas por otra versión del acuerdo. Requiere pertenecer al plan."
           },
           "event": [
             {
@@ -3869,7 +4291,27 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+                "description": "Lista las propuestas y su historial, votos efectivos, voto propio, mínimo requerido, vencimiento y acciones autorizadas. Evalúa propuestas vencidas o reemplazadas por otra versión del acuerdo. Requiere pertenecer al plan."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": 1,\n    \"planId\": 1,\n    \"createdById\": 2,\n    \"createdByName\": \"Ana Torres\",\n    \"baseAgreementVersion\": 1,\n    \"date\": \"2026-12-01\",\n    \"time\": null,\n    \"endDate\": \"2026-12-01\",\n    \"endTime\": null,\n    \"placeOptionId\": 2,\n    \"placeLabel\": \"La Lucha Barranco\",\n    \"location\": {\n      \"address\": \"Av. Pedro de Osma 110\",\n      \"district\": null,\n      \"latitude\": -12.1486,\n      \"longitude\": -77.0219\n    },\n    \"reason\": \"Otro día que funciona al grupo\",\n    \"status\": \"VOTING\",\n    \"yesVotes\": 1,\n    \"noVotes\": 0,\n    \"totalVoters\": 2,\n    \"requiredVotes\": 2,\n    \"myVote\": true,\n    \"canApply\": false,\n    \"canWithdraw\": true,\n    \"createdAt\": \"2026-11-16T00:28:55.616518Z\",\n    \"expiresAt\": \"2026-12-02T05:00:00Z\"\n  }\n]"
+            }
+          ]
         },
         {
           "name": "Sí asistiría si se aplica el cambio (invitado)",
@@ -3900,7 +4342,8 @@
                   "type": "string"
                 }
               ]
-            }
+            },
+            "description": "Registra o cambia el voto personal sobre una propuesta activa. Un voto afirmativo significa que la persona asistiría si se aplica ese cambio; todavía no altera el acuerdo. Requiere participación aceptada y devuelve 409 cuando la propuesta ya no admite votos."
           },
           "event": [
             {
@@ -3913,14 +4356,59 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/vote",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"accepted\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{guestToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": "Registra o cambia el voto personal sobre una propuesta activa. Un voto afirmativo significa que la persona asistiría si se aplica ese cambio; todavía no altera el acuerdo. Requiere participación aceptada y devuelve 409 cuando la propuesta ya no admite votos."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 1,\n  \"planId\": 1,\n  \"createdById\": 2,\n  \"createdByName\": \"Ana Torres\",\n  \"baseAgreementVersion\": 1,\n  \"date\": \"2026-12-01\",\n  \"time\": null,\n  \"endDate\": \"2026-12-01\",\n  \"endTime\": null,\n  \"placeOptionId\": 2,\n  \"placeLabel\": \"La Lucha Barranco\",\n  \"location\": {\n    \"address\": \"Av. Pedro de Osma 110\",\n    \"district\": null,\n    \"latitude\": -12.1486,\n    \"longitude\": -77.0219\n  },\n  \"reason\": \"Otro día que funciona al grupo\",\n  \"status\": \"APPROVED\",\n  \"yesVotes\": 2,\n  \"noVotes\": 0,\n  \"totalVoters\": 2,\n  \"requiredVotes\": 2,\n  \"myVote\": true,\n  \"canApply\": false,\n  \"canWithdraw\": false,\n  \"createdAt\": \"2026-11-16T00:28:55.616518Z\",\n  \"expiresAt\": \"2026-12-02T05:00:00Z\"\n}"
+            }
+          ]
         },
         {
           "name": "Aplicar reprogramación (organizador)",
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply"
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply",
+            "description": "Aplica una propuesta aprobada por mayoría y por el mínimo de asistentes. Solo el organizador o un administrador puede hacerlo. Incrementa agreementVersion, selecciona el nuevo día/lugar y convierte los votos afirmativos en confirmaciones sin una segunda pregunta. Las otras propuestas activas quedan reemplazadas."
           },
           "event": [
             {
@@ -3934,7 +4422,27 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/apply",
+                "description": "Aplica una propuesta aprobada por mayoría y por el mínimo de asistentes. Solo el organizador o un administrador puede hacerlo. Incrementa agreementVersion, selecciona el nuevo día/lugar y convierte los votos afirmativos en confirmaciones sin una segunda pregunta. Las otras propuestas activas quedan reemplazadas."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 1,\n  \"planId\": 1,\n  \"createdById\": 2,\n  \"createdByName\": \"Ana Torres\",\n  \"baseAgreementVersion\": 1,\n  \"date\": \"2026-12-01\",\n  \"time\": null,\n  \"endDate\": \"2026-12-01\",\n  \"endTime\": null,\n  \"placeOptionId\": 2,\n  \"placeLabel\": \"La Lucha Barranco\",\n  \"location\": {\n    \"address\": \"Av. Pedro de Osma 110\",\n    \"district\": null,\n    \"latitude\": -12.1486,\n    \"longitude\": -77.0219\n  },\n  \"reason\": \"Otro día que funciona al grupo\",\n  \"status\": \"APPLIED\",\n  \"yesVotes\": 2,\n  \"noVotes\": 0,\n  \"totalVoters\": 2,\n  \"requiredVotes\": 2,\n  \"myVote\": true,\n  \"canApply\": false,\n  \"canWithdraw\": false,\n  \"createdAt\": \"2026-11-16T00:28:55.616518Z\",\n  \"expiresAt\": \"2026-12-02T05:00:00Z\"\n}"
+            }
+          ]
         },
         {
           "name": "Crear otra propuesta para retirarla",
@@ -3955,7 +4463,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Crea una segunda alternativa sobre el acuerdo vigente para demostrar su retiro. Usa nextRescheduleDate diferente de la fecha aplicada y futura. El acuerdo no cambia al publicar; se registra el voto afirmativo del autor."
           },
           "event": [
             {
@@ -3969,14 +4478,49 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"date\": \"{{nextRescheduleDate}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Crea una segunda alternativa sobre el acuerdo vigente para demostrar su retiro. Usa nextRescheduleDate diferente de la fecha aplicada y futura. El acuerdo no cambia al publicar; se registra el voto afirmativo del autor."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 2,\n  \"planId\": 1,\n  \"createdById\": 2,\n  \"createdByName\": \"Ana Torres\",\n  \"baseAgreementVersion\": 2,\n  \"date\": \"2026-12-02\",\n  \"time\": null,\n  \"endDate\": \"2026-12-02\",\n  \"endTime\": null,\n  \"placeOptionId\": 2,\n  \"placeLabel\": \"La Lucha Barranco\",\n  \"location\": {\n    \"address\": \"Av. Pedro de Osma 110\",\n    \"district\": null,\n    \"latitude\": -12.1486,\n    \"longitude\": -77.0219\n  },\n  \"reason\": null,\n  \"status\": \"VOTING\",\n  \"yesVotes\": 1,\n  \"noVotes\": 0,\n  \"totalVoters\": 2,\n  \"requiredVotes\": 2,\n  \"myVote\": true,\n  \"canApply\": false,\n  \"canWithdraw\": true,\n  \"createdAt\": \"2026-11-16T00:28:57.142747900Z\",\n  \"expiresAt\": \"2026-12-03T05:00:00Z\"\n}"
+            }
+          ]
         },
         {
           "name": "Retirar propuesta sin cambiar el acuerdo",
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw"
+            "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw",
+            "description": "Retira una propuesta activa sin modificar el día, el lugar ni las asistencias actuales. Solo su autor, el organizador o un administrador puede retirarla. Devuelve estado WITHDRAWN; una propuesta terminada devuelve 409."
           },
           "event": [
             {
@@ -3990,14 +4534,35 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/reschedules/{{rescheduleId}}/withdraw",
+                "description": "Retira una propuesta activa sin modificar el día, el lugar ni las asistencias actuales. Solo su autor, el organizador o un administrador puede retirarla. Devuelve estado WITHDRAWN; una propuesta terminada devuelve 409."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 2,\n  \"planId\": 1,\n  \"createdById\": 2,\n  \"createdByName\": \"Ana Torres\",\n  \"baseAgreementVersion\": 2,\n  \"date\": \"2026-12-02\",\n  \"time\": null,\n  \"endDate\": \"2026-12-02\",\n  \"endTime\": null,\n  \"placeOptionId\": 2,\n  \"placeLabel\": \"La Lucha Barranco\",\n  \"location\": {\n    \"address\": \"Av. Pedro de Osma 110\",\n    \"district\": null,\n    \"latitude\": -12.1486,\n    \"longitude\": -77.0219\n  },\n  \"reason\": null,\n  \"status\": \"WITHDRAWN\",\n  \"yesVotes\": 1,\n  \"noVotes\": 0,\n  \"totalVoters\": 2,\n  \"requiredVotes\": 2,\n  \"myVote\": true,\n  \"canApply\": false,\n  \"canWithdraw\": false,\n  \"createdAt\": \"2026-11-16T00:28:57.142748Z\",\n  \"expiresAt\": \"2026-12-03T05:00:00Z\"\n}"
+            }
+          ]
         },
         {
           "name": "Reabrir manualmente para decidir de nuevo",
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": "{{baseUrl}}/plans/{{planId}}/reopen"
+            "url": "{{baseUrl}}/plans/{{planId}}/reopen",
+            "description": "Reabre explícitamente un plan confirmado. Solo el organizador o un administrador puede hacerlo. Conserva las opciones y votos, desmarca la selección, incrementa la versión del acuerdo y pasa las asistencias confirmadas a INTERESTED. A partir de aquí se puede invitar, editar y volver a decidir."
           },
           "event": [
             {
@@ -4011,7 +4576,27 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/plans/{{planId}}/reopen",
+                "description": "Reabre explícitamente un plan confirmado. Solo el organizador o un administrador puede hacerlo. Conserva las opciones y votos, desmarca la selección, incrementa la versión del acuerdo y pasa las asistencias confirmadas a INTERESTED. A partir de aquí se puede invitar, editar y volver a decidir."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"agreementVersion\": 3,\n  \"budget\": 60.0,\n  \"closedAt\": null,\n  \"createdAt\": \"2026-11-15T19:28:04.423677\",\n  \"creatorId\": 2,\n  \"creatorName\": \"Ana Torres\",\n  \"currentUserParticipationStatus\": \"JOINED\",\n  \"currentUserRole\": \"ORGANIZER\",\n  \"description\": \"Salida del grupo después de parciales\",\n  \"feasibilityScore\": 50,\n  \"feasibilityStatus\": \"TO_BE_DEFINED\",\n  \"id\": 1,\n  \"inviteCode\": \"11DAD266\",\n  \"minParticipants\": 2,\n  \"name\": \"Cena viernes\",\n  \"status\": \"OPEN\",\n  \"tentativeEndDate\": \"2026-12-01\",\n  \"tentativeStartDate\": \"2026-12-01\",\n  \"type\": \"DINNER\",\n  \"version\": 3\n}"
+            }
+          ]
         }
       ]
     },
@@ -4426,6 +5011,236 @@
               "status": "No Content",
               "code": 204,
               "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11. Session revocation and durable work",
+      "item": [
+        {
+          "name": "[ADMIN] List failed background jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/jobs",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Lista hasta cien trabajos fallidos del ámbito configurado. Solo ADMIN puede consultar sus identificadores, tipo, intentos y último error resumido; no devuelve destinatarios, payloads ni credenciales. Usa un identificador del resultado en backgroundJobId para reintentarlo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/admin/jobs",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": "Lista hasta cien trabajos fallidos del ámbito configurado. Solo ADMIN puede consultar sus identificadores, tipo, intentos y último error resumido; no devuelve destinatarios, payloads ni credenciales. Usa un identificador del resultado en backgroundJobId para reintentarlo."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[]"
+            }
+          ]
+        },
+        {
+          "name": "Revoke the organizer session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "description": "Revoca en el servidor la sesión asociada al refresh token del organizador. Invalida acceso y renovación de ese dispositivo y conserva otras sesiones. La operación es idempotente; requiere enviar refreshToken, no un access token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{baseUrl}}/auth/logout",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+                },
+                "description": "Revoca en el servidor la sesión asociada al refresh token del organizador. Invalida acceso y renovación de ese dispositivo y conserva otras sesiones. La operación es idempotente; requiere enviar refreshToken, no un access token."
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "401 - Revoked access token cannot read the profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/users/me",
+            "description": "Comprueba que el access token de una sesión revocada ya no puede leer el perfil, aunque su firma y fecha de expiración todavía sean válidas. Debe ejecutarse después de revocar la sesión del organizador."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/users/me",
+                "description": "Comprueba que el access token de una sesión revocada ya no puede leer el perfil, aunque su firma y fecha de expiración todavía sean válidas. Debe ejecutarse después de revocar la sesión del organizador."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2026-11-15T19:37:47.5560493\",\n  \"status\": 401,\n  \"error\": \"Unauthorized\",\n  \"message\": \"Full authentication is required to access this resource\",\n  \"path\": \"/api/v1/users/me\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "[ADMIN] Retry a failed background job",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/admin/jobs/{{backgroundJobId}}/retry",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Reintenta un trabajo FAILED del ámbito configurado. Requiere ADMIN y un backgroundJobId obtenido del listado de fallidos. Restablece los intentos y lo deja disponible para el worker; devolver 204 no garantiza entrega externa. Devuelve 404 si el trabajo no existe o pertenece a otro ámbito. Se omite en la colección cuando no se configura un trabajo fallido."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"backgroundJobId\")) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/admin/jobs/{{backgroundJobId}}/retry",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": "Reintenta un trabajo FAILED del ámbito configurado. Requiere ADMIN y un backgroundJobId obtenido del listado de fallidos. Restablece los intentos y lo deja disponible para el worker; devolver 204 no garantiza entrega externa. Devuelve 404 si el trabajo no existe o pertenece a otro ámbito. Se omite en la colección cuando no se configura un trabajo fallido."
+              },
+              "status": "No Content",
+              "code": 204,
               "header": [],
               "body": ""
             }

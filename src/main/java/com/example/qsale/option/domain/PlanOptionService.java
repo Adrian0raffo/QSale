@@ -148,7 +148,9 @@ public class PlanOptionService {
                     response.setHasVoted(votedOptions.contains(option.getId()));
                     return response;
                 })
-                .sorted(Comparator.comparingInt(OptionResponseDto::getScore).reversed())
+                .sorted(Comparator.comparingLong(OptionResponseDto::getVoteCount).reversed()
+                        .thenComparing(Comparator.comparingInt(OptionResponseDto::getScore).reversed())
+                        .thenComparing(OptionResponseDto::getId))
                 .toList();
     }
 
@@ -180,11 +182,14 @@ public class PlanOptionService {
     }
 
     private PlanOption bestVotedOption(Long planId, OptionType type) {
+        long participants = participantRepository.countByPlanIdAndStatus(planId, ParticipationStatus.JOINED);
         return optionRepository.findByPlanIdAndType(planId, type).stream()
                 .filter(option -> type != OptionType.DATE || option.isUpcoming(ZoneId.of(timeZone)))
                 .filter(option -> type != OptionType.PLACE || option.getLocation() != null)
                 .filter(option -> voteRepository.countByOptionId(option.getId()) > 0)
                 .max(Comparator.<PlanOption>comparingLong(option -> voteRepository.countByOptionId(option.getId()))
+                        .thenComparingInt(option -> feasibilityService.calculateOptionScore(option,
+                                voteRepository.countByOptionId(option.getId()), participants))
                         .thenComparing(option -> -option.getId()))
                 .orElseThrow(() -> new InvalidOperationException("A voted day and place are required before closing"));
     }

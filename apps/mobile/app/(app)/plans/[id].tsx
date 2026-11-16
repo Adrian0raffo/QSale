@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Share, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import QRCode from 'react-native-qrcode-svg';
 import {
   canContribute,
@@ -9,20 +9,16 @@ import {
   canRespond,
   isOrganizer,
   formatOptionDate,
-  validDay,
-  todayInLima,
   canManagePlan,
   commitmentLabels,
   feasibilityLabels,
   formatDate,
   formatMoney,
   planStatusLabels,
-  type AvailabilityInput,
   type CommitmentStatus,
   type PlanOption,
 } from '@qsale/contracts';
 import { DateRecommendations, ReschedulePanel } from '../../../src/Coordination';
-import { DateField } from '../../../src/DateField';
 import { api, useSession } from '../../../src/session';
 import { MapView, type MapPoint } from '../../../src/Map';
 import {
@@ -42,7 +38,6 @@ import {
   useAction,
   useToast,
 } from '../../../src/ui';
-
 function Section<T>({
   query,
   children,
@@ -64,67 +59,11 @@ function Section<T>({
     <>{children(query.data!)}</>
   );
 }
-function AvailabilityForm({ planId }: { planId: number }) {
-  const [date, setDate] = useState(''),
-    [start, setStart] = useState(''),
-    [end, setEnd] = useState(''),
-    [error, setError] = useState('');
-  const save = useAction(
-    (data: AvailabilityInput) => api.addAvailability(planId, data),
-    'Tu disponibilidad está guardada.',
-    () => {
-      setDate('');
-      setStart('');
-      setEnd('');
-    },
-  );
-  return (
-    <View style={styles.surface}>
-      <Text style={styles.subheading}>¿Cuándo tienes un espacio?</Text>
-      <DateField label="Día" value={date} onChange={setDate} optional={false} />
-      <DateField label="Desde (opcional)" mode="time" value={start} onChange={setStart} />
-      <DateField label="Hasta (opcional)" mode="time" value={end} onChange={setEnd} />
-      <Text style={styles.muted}>Hora de Lima. Si no indicas horas, se registra todo el día.</Text>
-      {Boolean(error) && (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      )}
-      <Button
-        busy={save.isPending}
-        onPress={() => {
-          setError('');
-          const today = todayInLima();
-          if (!validDay(date) || date < today) {
-            setError('Elige hoy o una fecha futura con el formato indicado.');
-            return;
-          }
-          if (
-            Boolean(start) !== Boolean(end) ||
-            (start &&
-              (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) ||
-                !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) ||
-                end <= start))
-          ) {
-            setError(
-              'Completa ambas horas con el formato HH:mm, colocando el final después del inicio, o deja ambas vacías.',
-            );
-            return;
-          }
-          save.mutate({
-            availableDate: date,
-            ...(start ? { startTime: start, endTime: end } : {}),
-          });
-        }}
-      >
-        Añadir disponibilidad
-      </Button>
-    </View>
-  );
-}
-
+import { AvailabilityForm } from '../../../src/AvailabilityForm';
 export default function PlanDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{
+    id: string;
+  }>();
   const planId = Number(id);
   const router = useRouter();
   const { user } = useSession();
@@ -213,7 +152,9 @@ export default function PlanDetail() {
     organizer = isOrganizer(plan, user),
     mine = commitments.data?.find((item) => item.userId === user!.id);
   const link =
-    (process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, '') ?? 'qsale:/') + '/join/' + plan.inviteCode;
+    (process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, '') ?? 'qsale:/') +
+    '/join/' +
+    plan.inviteCode;
   const request = (
     title: string,
     description: string,
@@ -316,8 +257,8 @@ export default function PlanDetail() {
               </Text>
             ))}
           <Text>
-            Si alguien no puede asistir, el día y el lugar se conservan. Solo quien organiza puede
-            aplicar una reprogramación aprobada o reabrir el plan.
+            Si alguien no puede asistir, el día y el lugar se conservan. Solo quien organiza
+            puede aplicar una reprogramación aprobada o reabrir el plan.
           </Text>
         </View>
       )}
@@ -344,8 +285,8 @@ export default function PlanDetail() {
                   {feasibilityLabels[value.status]}
                 </Badge>
                 <Text style={styles.subtitle}>
-                  {value.confirmedParticipants} de {value.minParticipants} confirmaciones mínimas ·
-                  Viabilidad {value.score}%
+                  {value.confirmedParticipants} de {value.minParticipants} confirmaciones
+                  mínimas · Viabilidad {value.score}%
                 </Text>
                 <View
                   accessibilityRole="progressbar"
@@ -358,7 +299,11 @@ export default function PlanDetail() {
                   }}
                 >
                   <View
-                    style={{ height: 6, width: `${value.score}%`, backgroundColor: colors.accent }}
+                    style={{
+                      height: 6,
+                      width: `${value.score}%`,
+                      backgroundColor: colors.accent,
+                    }}
                   />
                 </View>
                 <Text style={styles.muted}>
@@ -567,8 +512,9 @@ export default function PlanDetail() {
                       ? 'Aún no se une'
                       : commitments.data?.find((response) => response.userId === item.userId)
                         ? commitmentLabels[
-                            commitments.data.find((response) => response.userId === item.userId)!
-                              .status
+                            commitments.data.find(
+                              (response) => response.userId === item.userId,
+                            )!.status
                           ]
                         : 'Sin respuesta'}
                   </Text>
@@ -577,7 +523,10 @@ export default function PlanDetail() {
                   ) && (
                     <Text style={styles.muted}>
                       Nota:{' '}
-                      {commitments.data?.find((response) => response.userId === item.userId)?.note}
+                      {
+                        commitments.data?.find((response) => response.userId === item.userId)
+                          ?.note
+                      }
                     </Text>
                   )}
                   {plan.status === 'OPEN' &&

@@ -213,7 +213,7 @@ class BackendRegressionIntegrationTest extends AbstractContainerBaseTest {
         assertEquals(ParticipantRole.GUEST,
                 participants.findByPlanIdAndUserId(otherPlan, first.id()).orElseThrow().getRole());
         mvc.perform(auth(put("/api/v1/plans/{id}", ownPlan), first).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Own plan edited\",\"type\":\"DINNER\",\"minParticipants\":2}"))
+                .content("{\"name\":\"Own plan edited\",\"type\":\"DINNER\",\"minParticipants\":2,\"version\":0}"))
                 .andExpect(status().isOk());
         mvc.perform(auth(put("/api/v1/plans/{id}", otherPlan), first).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Other plan edited\",\"type\":\"DINNER\",\"minParticipants\":2}"))

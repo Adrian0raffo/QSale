@@ -2,6 +2,8 @@ package com.example.qsale.notification.domain;
 
 import com.example.qsale.exceptions.ResourceNotFoundException;
 import com.example.qsale.exceptions.InvalidOperationException;
+import com.example.qsale.jobs.BackgroundQueue;
+import com.example.qsale.jobs.JobPayload;
 import com.example.qsale.notification.dto.NotificationPageResponseDto;
 import com.example.qsale.notification.dto.NotificationResponseDto;
 import com.example.qsale.notification.infrastructure.NotificationRepository;
@@ -37,7 +39,7 @@ public class NotificationService {
     private final PlanParticipantRepository participantRepository;
     private final PlanOptionRepository optionRepository;
     private final PlanAccessService planAccessService;
-    private final EmailService emailService;
+    private final BackgroundQueue queue;
     private final UserService userService;
     private final ModelMapper modelMapper;
 
@@ -83,8 +85,8 @@ public class NotificationService {
 
     public void sendWelcomeEmail(Long userId) {
         User user = userService.getUserById(userId);
-        emailService.sendHtmlEmail(user.getEmail(), "Bienvenido a QSale", "email/welcome",
-                Map.of("name", user.getName(), "email", user.getEmail()));
+        queue.enqueue("EMAIL",new JobPayload(null,null,user.getEmail(),"Bienvenido a QSale","email/welcome",
+                Map.of("name", user.getName(), "email", user.getEmail())));
     }
 
     @Transactional
@@ -175,10 +177,10 @@ public class NotificationService {
 
     private void notify(User recipient, Plan plan, NotificationType type, String message, EmailContent email) {
         Notification notification = new Notification(recipient, plan, type, message);
-        boolean delivered = email == null || emailService.sendHtmlEmail(
-                recipient.getEmail(), email.subject(), email.template(), email.variables());
-        notification.setStatus(delivered ? NotificationStatus.SENT : NotificationStatus.FAILED);
-        notification.setSentAt(delivered ? LocalDateTime.now() : null);
+        notification.setStatus(email == null ? NotificationStatus.SENT : NotificationStatus.PENDING);
+        notification.setSentAt(email == null ? LocalDateTime.now() : null);
         notificationRepository.save(notification);
+        if(email!=null) queue.enqueue("EMAIL",new JobPayload(null,notification.getId(),recipient.getEmail(),
+                email.subject(),email.template(),email.variables()));
     }
 }

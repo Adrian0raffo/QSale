@@ -2,15 +2,22 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main, 'fix/**', 'feat/**', 'chore/**']
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 21

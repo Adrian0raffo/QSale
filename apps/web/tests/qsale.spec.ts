@@ -7,6 +7,8 @@ const password = 'FrontendTest2026';
 const futureDate = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 let planId: number;
 let tokenA: string;
+let paginationToken: string;
+const paginationEmail = `web.pagination.${stamp}@qsale.test`;
 const extraPlans: number[] = [];
 async function register(page: Page, name: string, email: string) {
   await page.goto('/register');
@@ -22,6 +24,7 @@ test('two people organize, vote, confirm and close a plan through the real API',
   browser,
   request,
 }, testInfo) => {
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await register(page, 'Ana del grupo', emailA);
@@ -69,11 +72,13 @@ test('two people organize, vote, confirm and close a plan through the real API',
   await bob.getByRole('button', { name: 'Votar', exact: true }).click();
   await page.getByLabel('Una nota para tu grupo (opcional)').fill('Llego después de clase');
   await page.getByRole('button', { name: 'Sí, voy' }).click();
+  await expect(page.getByText('Tu nota guardada: Llego después de clase')).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('Una nota para tu grupo (opcional)')).toHaveValue(
     'Llego después de clase',
   );
   await page.getByRole('button', { name: 'Me interesa', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Me interesa', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.reload();
   await expect(page.getByLabel('Una nota para tu grupo (opcional)')).toHaveValue(
     'Llego después de clase',
@@ -116,7 +121,12 @@ test('two people organize, vote, confirm and close a plan through the real API',
   await page.getByLabel('Longitud', { exact: true }).fill('-77.03');
   await expect(page.getByRole('button', { name: 'Guardar mi perfil' })).toBeEnabled();
   await page.getByLabel('Nombre', { exact: true }).fill('Ana actualizada');
+  const profileSaved = page.waitForResponse(response =>
+    response.url().endsWith('/backend/api/v1/users/me') &&
+    response.request().method() === 'PUT' && response.ok(),
+  );
   await page.getByRole('button', { name: 'Guardar mi perfil' }).click();
+  await profileSaved;
   await page.reload();
   await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Ana actualizada');
   await bobContext.close();
@@ -127,7 +137,11 @@ test('server pagination, URL filters, mobile layout and protected navigation', a
   page,
   request,
 }, testInfo) => {
-  test.skip(!tokenA, 'Requires the full journey account.');
+  const registered = await request.post('http://127.0.0.1:19080/api/v1/auth/signup', {
+    data: {name:'Pagination reader',email:paginationEmail,password},
+  });
+  expect(registered.status()).toBe(201);
+  paginationToken = (await registered.json()).token;
   for (const [index, name] of [
     'Ruta por Barranco',
     'Pichanga del domingo',
@@ -142,7 +156,7 @@ test('server pagination, URL filters, mobile layout and protected navigation', a
     'Caminata frente al mar',
   ].entries()) {
     const result = await request.post('http://127.0.0.1:19080/api/v1/plans', {
-      headers: { Authorization: 'Bearer ' + tokenA },
+      headers: { Authorization: 'Bearer ' + paginationToken },
       data: {
         name,
         type: [
@@ -167,22 +181,22 @@ test('server pagination, URL filters, mobile layout and protected navigation', a
   }
   await page.goto('/plans?size=10');
   await expect(page).toHaveURL(/\/login\?returnTo=/);
-  await page.getByLabel('Correo electrónico').fill(emailA);
+  await page.getByLabel('Correo electrónico').fill(paginationEmail);
   await page.getByLabel('Contraseña', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Entrar a QSale' }).click();
   await expect(page.getByRole('article')).toHaveCount(10);
   await page.getByRole('button', { name: 'Página siguiente' }).click();
   await expect(page).toHaveURL(/page=2/);
-  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('article')).toHaveCount(1);
   await page.reload();
-  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('article')).toHaveCount(1);
   await page.getByLabel('Buscar planes por nombre o descripción').fill('Barranco');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page).toHaveURL(/search=Barranco/);
   await page.getByLabel('Buscar planes por nombre o descripción').fill('');
   await expect(page.getByRole('article')).toHaveCount(10);
   await page.getByLabel('Elementos por página').selectOption('25');
-  await expect(page.getByRole('article')).toHaveCount(12);
+  await expect(page.getByRole('article')).toHaveCount(11);
   await page.screenshot({ path: testInfo.outputPath('plans-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
@@ -206,9 +220,12 @@ test('server pagination, URL filters, mobile layout and protected navigation', a
   await expect(page.getByRole('heading', { name: 'Este camino no lleva a un plan' })).toBeVisible();
 });
 test.afterAll(async ({ request }) => {
-  if (tokenA)
-    for (const id of [...extraPlans, planId].filter(Boolean))
+  if (paginationToken)
+    for (const id of extraPlans)
       await request.delete('http://127.0.0.1:19080/api/v1/plans/' + id, {
-        headers: { Authorization: 'Bearer ' + tokenA },
+        headers: { Authorization: 'Bearer ' + paginationToken },
       });
+  if (tokenA && planId) await request.delete('http://127.0.0.1:19080/api/v1/plans/' + planId, {
+    headers: { Authorization: 'Bearer ' + tokenA },
+  });
 });
