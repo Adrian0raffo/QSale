@@ -76,7 +76,7 @@ jobs:
           cache: maven
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: ./mvnw -B package -DskipTests
+      - run: mvn -B package -DskipTests
       - name: Start the isolated API
         shell: bash
         run: |
