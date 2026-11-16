@@ -54,7 +54,6 @@ jobs:
         ports:
           - 1025:1025
     env:
-      PORT: '19080'
       DB_PORT: '5433'
       DB_NAME: qsale_test
       DB_PASSWORD: integration-test-only
@@ -78,6 +77,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: mvn -B package -DskipTests
       - name: Start the isolated API
+        env:
+          PORT: '19080'
         shell: bash
         run: |
           java -jar target/qsale-0.0.1-SNAPSHOT.jar > "$RUNNER_TEMP/qsale-api.log" 2>&1 &
